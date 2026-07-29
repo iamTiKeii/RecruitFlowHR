@@ -4277,7 +4277,13 @@ function checkContractExpirationsTrigger() {
     
     for (var i = 0; i < employees.length; i++) {
       var emp = employees[i];
-      if (emp.status !== 'Đang làm' && emp.status !== 'Thử việc') continue;
+      if (emp.status !== 'Đang làm' && emp.status !== 'Thử việc' && emp.status !== 'Chính thức') continue;
+      
+      // Lọc bỏ hợp đồng không xác định thời hạn
+      var contractType = String(emp.contractType || '').toLowerCase().trim();
+      if (contractType === 'không xác định thời hạn' || contractType === 'indefinite' || contractType === 'vô thời hạn') {
+        continue;
+      }
       
       var targetDateStr = emp.contractExpiryDate || emp.probationEndDate || emp.endDate;
       if (!targetDateStr) continue;
@@ -4300,9 +4306,11 @@ function checkContractExpirationsTrigger() {
     
     if (expiringEmployees.length === 0) return { success: true, message: "Không có hợp đồng nào đến hạn cảnh báo hôm nay." };
     
-    var hrUsers = getUsersList('admin');
-    var hrEmails = hrUsers.filter(u => u.role === 'Admin' || u.role === 'HR').map(u => u.email).join(',');
-    if (!hrEmails) hrEmails = Session.getActiveUser().getEmail();
+    var hrUsers = getUsersList();
+    var hrEmailsList = hrUsers.filter(u => u.role === 'Admin' || u.role === 'HR').map(u => u.email);
+    if (hrEmailsList.length === 0 && getActiveUserEmail()) {
+      hrEmailsList.push(getActiveUserEmail());
+    }
     
     var bodyHtml = "<div style='font-family: sans-serif; font-size: 13px; color: #1e293b; max-width: 650px; margin: 0 auto; border: 1px solid #e2e8f0; padding: 20px; border-radius: 12px;'>" +
                    "<h3 style='color: #4f46e5; margin-top: 0;'>CẢNH BÁO TỰ ĐỘNG: HỢP ĐỒNG LAO ĐỘNG SẮP HẾT HẠN</h3>" +
@@ -4325,13 +4333,19 @@ function checkContractExpirationsTrigger() {
                 "<p style='margin-top: 15px;'>Vui lòng truy cập hệ thống RecruitFlow HRM để tiến hành quy trình Đánh giá Tái ký Hợp đồng theo đúng Luật Lao động 2019.</p>" +
                 "</div>";
     
-    MailApp.sendEmail({
-      to: hrEmails,
-      subject: "[RecruitFlow HRM] Cảnh báo Hợp đồng sắp hết hạn (" + expiringEmployees.length + " nhân sự)",
-      htmlBody: bodyHtml
+    var sentCount = 0;
+    var failedEmails = [];
+    hrEmailsList.forEach(function(toEmail) {
+      try {
+        sendEmailWithFallback(toEmail, "[RecruitFlow HRM] Cảnh báo Hợp đồng sắp hết hạn (" + expiringEmployees.length + " nhân sự)", bodyHtml);
+        sentCount++;
+      } catch (err) {
+        Logger.log("Lỗi gửi email cảnh báo hợp đồng tới " + toEmail + ": " + err.message);
+        failedEmails.push({ email: toEmail, error: err.message });
+      }
     });
     
-    return { success: true, count: expiringEmployees.length };
+    return { success: true, count: expiringEmployees.length, sentCount: sentCount, failedEmails: failedEmails };
   } catch (e) {
     Logger.log("Lỗi checkContractExpirationsTrigger: " + e.message);
     return { success: false, message: e.message };
@@ -4841,9 +4855,17 @@ function getSalaryDecisionPrintHtml(histId) {
  */
 
 /**
- * Get all Master Data categories
+ * Get all Master Data categories (with CacheService 30 mins TTL)
  */
 function getCategories() {
+  var cache = CacheService.getScriptCache();
+  var cached = cache.get('master_categories');
+  if (cached) {
+    try {
+      return JSON.parse(cached);
+    } catch(e) {}
+  }
+  
   try {
     var ss = getSpreadsheet();
     if (!ss) throw new Error("Không thể kết nối với Google Spreadsheet.");
@@ -4867,6 +4889,11 @@ function getCategories() {
         description: data[i][5] ? String(data[i][5]).trim() : ""
       });
     }
+    
+    try {
+      cache.put('master_categories', JSON.stringify(categories), 1800); // 30 phút TTL
+    } catch(e) {}
+    
     return categories;
   } catch (error) {
     Logger.log("Lỗi trong getCategories: " + error.toString());
@@ -4911,6 +4938,10 @@ function addCategory(cat) {
       cat.description || ""
     ]);
     
+    try {
+      CacheService.getScriptCache().remove('master_categories');
+    } catch(e) {}
+    
     return { success: true, id: nextId };
   } catch (error) {
     Logger.log("Lỗi trong addCategory: " + error.toString());
@@ -4952,6 +4983,10 @@ function updateCategory(cat) {
       cat.description || ""
     ]]);
     
+    try {
+      CacheService.getScriptCache().remove('master_categories');
+    } catch(e) {}
+    
     return { success: true };
   } catch (error) {
     Logger.log("Lỗi trong updateCategory: " + error.toString());
@@ -4984,7 +5019,12 @@ function deleteCategory(catId) {
     }
     
     if (rowIdx === -1) throw new Error("Không tìm thấy ID danh mục cần xóa: " + catId);
+    
     sheet.deleteRow(rowIdx);
+    
+    try {
+      CacheService.getScriptCache().remove('master_categories');
+    } catch(e) {}
     
     return { success: true };
   } catch (error) {
