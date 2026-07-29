@@ -119,8 +119,6 @@ function getSpreadsheet() {
   }
 }
 
-}
-
 /**
  * Shared utility for Batch Reading a Google Sheet into RAM (2D Array)
  * Returns { sheet, data, headers, lastRow, lastCol }
