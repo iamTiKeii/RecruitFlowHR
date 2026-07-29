@@ -119,15 +119,68 @@ function getSpreadsheet() {
   }
 }
 
-/**
- * Helper to generate random salt
- */
-function generateRandomSalt() {
-  return Utilities.getUuid().replace(/-/g, '').substring(0, 16);
 }
 
 /**
- * Secure SHA-256 Hashing helper with optional dynamic salt
+ * Shared utility for Batch Reading a Google Sheet into RAM (2D Array)
+ * Returns { sheet, data, headers, lastRow, lastCol }
+ */
+function batchReadSheet(sheetName) {
+  var ss = getSpreadsheet();
+  var sheet = ss.getSheetByName(sheetName);
+  if (!sheet) return { sheet: null, data: [], headers: [], lastRow: 0, lastCol: 0 };
+  var data = sheet.getDataRange().getValues();
+  if (data.length === 0) return { sheet: sheet, data: [], headers: [], lastRow: 0, lastCol: 0 };
+  var headers = data[0].map(function(h) { return String(h).trim(); });
+  return {
+    sheet: sheet,
+    data: data,
+    headers: headers,
+    lastRow: sheet.getLastRow(),
+    lastCol: sheet.getLastColumn()
+  };
+}
+
+/**
+ * Shared utility for Batch Writing a 2D Array to a Google Sheet with LockService protection
+ * Prevents concurrency conflicts and avoids row-by-row I/O overhead
+ */
+function batchWriteSheet(sheetName, dataArray) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000); // 10 seconds wait for lock
+    var ss = getSpreadsheet();
+    var sheet = ss.getSheetByName(sheetName);
+    if (!sheet) {
+      sheet = ss.insertSheet(sheetName);
+    }
+    if (!dataArray || dataArray.length === 0) return { success: true };
+    sheet.clearContents();
+    var numRows = dataArray.length;
+    var numCols = dataArray[0].length;
+    sheet.getRange(1, 1, numRows, numCols).setValues(dataArray);
+    SpreadsheetApp.flush();
+    return { success: true };
+  } catch (e) {
+    throw new Error("Lỗi batchWriteSheet (" + sheetName + "): " + e.message);
+  } finally {
+    try { lock.releaseLock(); } catch(err) {}
+  }
+}
+
+/**
+ * Helper to generate random individual salt (32-character hex)
+ */
+function generateRandomSalt() {
+  return Utilities.getUuid().replace(/-/g, '') + Utilities.getUuid().replace(/-/g, '').substring(0, 8);
+}
+
+function generateSalt() {
+  return generateRandomSalt();
+}
+
+/**
+ * Secure SHA-256 Hashing helper with individual salt support
  */
 function hashPassword(password, salt) {
   var useSalt = salt || "MY_FIXED_SALT_123";
@@ -142,6 +195,66 @@ function hashPassword(password, salt) {
   }
   return hashStr;
 }
+
+function hashPasswordWithSalt(password, salt) {
+  return hashPassword(password, salt);
+}
+
+/**
+ * Migrates all legacy users (who used fixed salt "MY_FIXED_SALT_123") to Individual Salt.
+ * Creates a JSON snapshot backup of current Users table in ScriptProperties before overwriting.
+ */
+function migrateLegacyUsersToIndividualSalt() {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+    var readRes = batchReadSheet('Users');
+    var data = readRes.data;
+    if (data.length <= 1) return { success: true, message: "Không có người dùng nào cần chuyển đổi." };
+
+    var headers = readRes.headers;
+    var saltCol = headers.indexOf('IndividualSalt');
+    if (saltCol === -1) saltCol = headers.indexOf('Salt');
+
+    // Add IndividualSalt column header if missing
+    if (saltCol === -1) {
+      data[0].push('IndividualSalt');
+      saltCol = data[0].length - 1;
+      for (var r = 1; r < data.length; r++) {
+        data[r].push('');
+      }
+    }
+
+    // BACKUP SNAPSHOT: Save snapshot to ScriptProperties before modifying Users table
+    var backupKey = 'USERS_BACKUP_' + Utilities.formatDate(new Date(), Session.getScriptTimeZone(), 'yyyyMMdd_HHmmss');
+    PropertiesService.getScriptProperties().setProperty(backupKey, JSON.stringify(data));
+
+    var countMigrated = 0;
+    for (var i = 1; i < data.length; i++) {
+      var currentSalt = data[i][saltCol] ? String(data[i][saltCol]).trim() : '';
+      if (!currentSalt) {
+        var newSalt = generateSalt();
+        data[i][saltCol] = newSalt;
+        countMigrated++;
+      }
+    }
+
+    if (countMigrated > 0) {
+      batchWriteSheet('Users', data);
+    }
+
+    return { 
+      success: true, 
+      message: "Đã tạo backup snapshot (" + backupKey + ") và nâng cấp Individual Salt thành công cho " + countMigrated + " người dùng.",
+      backupKey: backupKey 
+    };
+  } catch (e) {
+    return { success: false, message: "Lỗi chuyển đổi Individual Salt: " + e.message };
+  } finally {
+    try { lock.releaseLock(); } catch(err) {}
+  }
+}
+
 
 /**
  * Server-side RBAC Guard for RPC functions
@@ -574,7 +687,7 @@ function initSystem() {
 
         var MASTER_SCHEMA = {
             'Config': ['ConfigKey', 'ConfigValue', 'Description'],
-            'Users': ['Email', 'PasswordHash', 'FullName', 'Role', 'Department', 'Salt'],
+            'Users': ['Email', 'PasswordHash', 'FullName', 'Role', 'Department', 'Salt', 'IndividualSalt'],
             'Categories': ['ID', 'CategoryType', 'Code', 'Name', 'Value', 'Description'],
             'PrintTemplates': ['ID', 'TemplateName', 'Category', 'HtmlContent', 'Description', 'CreatedAt'],
             'Employees': [
@@ -605,7 +718,8 @@ function initSystem() {
                 'IdentityCardNumber', 'IdentityCardDate', 'IdentityCardPlace', 'AcademicLevel',
                 'Specialization', 'GraduationInstitution', 'YouthUnionDate', 'CommunistPartyDateStatus', 'Docs', 'DateOfBirth', 'Department', 'Dependents'
             ],
-            'SalaryHistory': ['ID', 'EmployeeID', 'NewSalary', 'ChangeDate', 'FileBase64', 'Notes']
+            'SalaryHistory': ['ID', 'EmployeeID', 'NewSalary', 'ChangeDate', 'FileBase64', 'Notes'],
+            'JobHistory': ['ID', 'EmployeeID', 'EmployeeName', 'ChangeType', 'OldValue', 'NewValue', 'EffectiveDate', 'DecisionNumber', 'Notes', 'CreatedAt']
         };
 
         function getSheetHeaders(sheet) {
@@ -639,6 +753,37 @@ function initSystem() {
                     results.push("Đã thêm cột thiếu [" + addedColumns.join(", ") + "] vào sheet: " + sheetName);
                 }
             }
+        }
+
+        // Khởi tạo các thông số tuân thủ Luật Lao động Việt Nam trong bảng Config nếu chưa có
+        var defaultConfigEntries = [
+            {
+                key: 'base_salary_cap',
+                value: '46800000',
+                desc: 'Mức lương đóng BHXH & BHYT tối đa = 20 lần Lương cơ sở = 20 x 2,340,000 = 46,800,000 VNĐ/tháng (Áp dụng từ 01/07/2024 theo Nghị định 73/2024/NĐ-CP)'
+            },
+            {
+                key: 'region_min_salary_cap',
+                value: '99200000',
+                desc: 'Mức lương đóng BHTN tối đa = 20 lần Lương tối thiểu vùng I = 20 x 4,960,000 = 99,200,000 VNĐ/tháng (Áp dụng từ 01/07/2024 theo Nghị định 74/2024/NĐ-CP)'
+            },
+            {
+                key: 'contract_alert_days',
+                value: '15,30,60',
+                desc: 'Số ngày cảnh báo trước khi hết hạn Hợp đồng lao động / Thử việc (Theo Điều 21, 26 Bộ luật Lao động 2019)'
+            }
+        ];
+        
+        var configSheet = ss.getSheetByName('Config');
+        if (configSheet) {
+            var configData = configSheet.getDataRange().getValues();
+            var existingKeys = configData.map(function(r) { return String(r[0]).toLowerCase().trim(); });
+            defaultConfigEntries.forEach(function(item) {
+                if (existingKeys.indexOf(item.key.toLowerCase()) === -1) {
+                    configSheet.appendRow([item.key, item.value, item.desc]);
+                    results.push("Đã khởi tạo tham số pháp lý: " + item.key);
+                }
+            });
         }
         
         // Kiểm tra xem đã có thư mục lưu trữ PDF chưa
@@ -4057,6 +4202,172 @@ function calculatePIT(taxableIncome) {
 }
 
 /**
+ * Tự động tính Bảo hiểm bắt buộc theo Luật Lao động Việt Nam
+ * - BHXH (8%) + BHYT (1.5%) = 9.5%, khống chế trần 20 lần Lương cơ sở (46,800,000 VNĐ - NĐ 73/2024/NĐ-CP)
+ * - BHTN (1%) = 1.0%, khống chế trần 20 lần Lương tối thiểu vùng I (99,200,000 VNĐ - NĐ 74/2024/NĐ-CP)
+ */
+function calculateMandatoryInsurance(socialInsuranceSalary, basicSalary) {
+  var configs = getConfig();
+  var baseSalaryCap = Number(configs.base_salary_cap || 46800000);
+  var regionMinSalaryCap = Number(configs.region_min_salary_cap || 99200000);
+  
+  var salaryBase = Number(socialInsuranceSalary) || Number(basicSalary) || 0;
+  
+  // BHXH (8%) + BHYT (1.5%) = 9.5% (Capped at 20x Base Salary)
+  var bhxhBhytBase = Math.min(salaryBase, baseSalaryCap);
+  var bhxhBhyt = bhxhBhytBase * 0.095;
+  
+  // BHTN (1%) (Capped at 20x Region I Min Salary)
+  var bhtnBase = Math.min(salaryBase, regionMinSalaryCap);
+  var bhtn = bhtnBase * 0.01;
+  
+  return Math.round(bhxhBhyt + bhtn);
+}
+
+/**
+ * Trình kích hoạt chạy hàng ngày (Daily Time-driven Trigger):
+ * Quét danh sách nhân viên có hợp đồng / thời gian thử việc sắp hết hạn (15/30/60 ngày).
+ * Tự động gửi Email thông báo tới Trưởng phòng & HR kèm hướng dẫn Đánh giá Tái ký.
+ */
+function checkContractExpirationsTrigger() {
+  try {
+    var configs = getConfig();
+    var alertDaysStr = configs.contract_alert_days || "15,30,60";
+    var alertDaysList = alertDaysStr.split(',').map(function(d) { return parseInt(d.trim(), 10); }).filter(function(d) { return !isNaN(d); });
+    
+    var employees = getEmployees();
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    var expiringEmployees = [];
+    
+    for (var i = 0; i < employees.length; i++) {
+      var emp = employees[i];
+      if (emp.status !== 'Đang làm' && emp.status !== 'Thử việc') continue;
+      
+      var targetDateStr = emp.contractExpiryDate || emp.probationEndDate || emp.endDate;
+      if (!targetDateStr) continue;
+      
+      var targetDate = new Date(targetDateStr);
+      if (isNaN(targetDate.getTime())) continue;
+      targetDate.setHours(0, 0, 0, 0);
+      
+      var diffTime = targetDate.getTime() - today.getTime();
+      var diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+      
+      if (alertDaysList.indexOf(diffDays) !== -1) {
+        expiringEmployees.push({
+          emp: emp,
+          daysLeft: diffDays,
+          expiryDate: targetDateStr
+        });
+      }
+    }
+    
+    if (expiringEmployees.length === 0) return { success: true, message: "Không có hợp đồng nào đến hạn cảnh báo hôm nay." };
+    
+    var hrUsers = getUsersList('admin');
+    var hrEmails = hrUsers.filter(u => u.role === 'Admin' || u.role === 'HR').map(u => u.email).join(',');
+    if (!hrEmails) hrEmails = Session.getActiveUser().getEmail();
+    
+    var bodyHtml = "<div style='font-family: sans-serif; font-size: 13px; color: #1e293b; max-width: 650px; margin: 0 auto; border: 1px solid #e2e8f0; padding: 20px; border-radius: 12px;'>" +
+                   "<h3 style='color: #4f46e5; margin-top: 0;'>CẢNH BÁO TỰ ĐỘNG: HỢP ĐỒNG LAO ĐỘNG SẮP HẾT HẠN</h3>" +
+                   "<p>Hệ thống RecruitFlow HRM phát hiện <b>" + expiringEmployees.length + " nhân sự</b> có hợp đồng sắp đến hạn tái ký:</p>" +
+                   "<table border='1' cellpadding='8' cellspacing='0' style='border-collapse: collapse; width: 100%; font-size: 12px; border-color: #cbd5e1;'>" +
+                   "<tr style='background-color: #f1f5f9; text-align: left;'><th>Mã NV</th><th>Họ tên</th><th>Phòng ban</th><th>Chức danh</th><th>Ngày hết hạn</th><th>Cảnh báo trước</th></tr>";
+    
+    expiringEmployees.forEach(function(item) {
+      bodyHtml += "<tr>" +
+        "<td>" + item.emp.id + "</td>" +
+        "<td><b>" + item.emp.fullName + "</b></td>" +
+        "<td>" + (item.emp.department || '-') + "</td>" +
+        "<td>" + (item.emp.position || '-') + "</td>" +
+        "<td>" + item.expiryDate + "</td>" +
+        "<td style='color: #e11d48; font-weight: bold;'>" + item.daysLeft + " ngày</td>" +
+        "</tr>";
+    });
+    
+    bodyHtml += "</table>" +
+                "<p style='margin-top: 15px;'>Vui lòng truy cập hệ thống RecruitFlow HRM để tiến hành quy trình Đánh giá Tái ký Hợp đồng theo đúng Luật Lao động 2019.</p>" +
+                "</div>";
+    
+    MailApp.sendEmail({
+      to: hrEmails,
+      subject: "[RecruitFlow HRM] Cảnh báo Hợp đồng sắp hết hạn (" + expiringEmployees.length + " nhân sự)",
+      htmlBody: bodyHtml
+    });
+    
+    return { success: true, count: expiringEmployees.length };
+  } catch (e) {
+    Logger.log("Lỗi checkContractExpirationsTrigger: " + e.message);
+    return { success: false, message: e.message };
+  }
+}
+
+/**
+ * Tạo tự động Trình kích hoạt chạy hàng ngày lúc 7:00 AM cho checkContractExpirationsTrigger
+ */
+function setupContractExpirationDailyTrigger() {
+  var triggers = ScriptApp.getProjectTriggers();
+  for (var i = 0; i < triggers.length; i++) {
+    if (triggers[i].getHandlerFunction() === 'checkContractExpirationsTrigger') {
+      ScriptApp.deleteTrigger(triggers[i]);
+    }
+  }
+  ScriptApp.newTrigger('checkContractExpirationsTrigger')
+    .timeBased()
+    .everyDays(1)
+    .atHour(7)
+    .create();
+  return { success: true, message: "Đã cài đặt Trình kích hoạt cảnh báo Hợp đồng chạy lúc 7h00 hàng ngày." };
+}
+
+/**
+ * Ghi vết Lịch sử Biến động Nhân sự vào trang tính JobHistory
+ * ChangeType: 'Recruited', 'Probation', 'Official', 'Promoted', 'Transferred', 'SalaryRaised', 'Disciplined', 'Resigned'
+ */
+function logJobHistory(employeeId, employeeName, changeType, oldValue, newValue, effectiveDate, decisionNumber, notes) {
+  try {
+    var lock = LockService.getScriptLock();
+    lock.waitLock(5000);
+    
+    var ss = getSpreadsheet();
+    var sheet = ss.getSheetByName('JobHistory');
+    if (!sheet) {
+      initializeDatabaseV2();
+      sheet = ss.getSheetByName('JobHistory');
+    }
+    
+    var id = "JH-" + Number(new Date()) + "-" + Math.floor(Math.random() * 1000);
+    var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+    var effDateStr = effectiveDate || Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+    
+    var row = [
+      id,
+      employeeId || '',
+      employeeName || '',
+      changeType || 'Update',
+      String(oldValue !== undefined && oldValue !== null ? oldValue : ''),
+      String(newValue !== undefined && newValue !== null ? newValue : ''),
+      effDateStr,
+      decisionNumber || '',
+      notes || '',
+      nowStr
+    ];
+    
+    sheet.appendRow(row);
+    SpreadsheetApp.flush();
+    return { success: true, id: id };
+  } catch (e) {
+    Logger.log("Lỗi logJobHistory: " + e.message);
+    return { success: false, message: e.message };
+  } finally {
+    try { LockService.getScriptLock().releaseLock(); } catch(err) {}
+  }
+}
+
+
+/**
  * Perform monthly payroll calculations with RBAC, Social Insurance Cap, Dependents PIT Tax & Approved OT Requests
  */
 function calculatePayroll(month, year) {
@@ -4166,10 +4477,8 @@ function calculatePayroll(month, year) {
     
     var gross = basicSalary + allowance + otSalary;
     
-    // Social Insurance Base (Capped at 46,800,000 VNĐ - 20x Base Salary)
-    var insBase = emp.socialInsuranceSalary || basicSalary;
-    insBase = Math.min(insBase, 46800000);
-    var insurance = Math.round(insBase * 0.105);
+    // Social & Unemployment Insurance Base (Capped according to Decree 73/2024/NĐ-CP & 74/2024/NĐ-CP)
+    var insurance = calculateMandatoryInsurance(emp.socialInsuranceSalary, basicSalary);
     
     // PIT Taxable Income with Dependents Deduction (4,400,000 VNĐ per dependent)
     var dependents = emp.dependents || 0;
@@ -4966,73 +5275,116 @@ function getEmployeeDetail(employeeId) {
 }
 
 /**
- * LUU THAY DOI CHI TIET: Cap nhat dong bo ca 2 bang Employees va EmployeeDetails
- * Tu khac phuc: Neu EmployeeDetails chua co dong thi tu tao truoc khi luu
+ * LƯU THAY ĐỔI CHI TIẾT NÂNG CẤP BATCH PROCESSING & TỰ ĐỘNG GHI JOB HISTORY
+ * Cập nhật đồng bộ cả 2 bảng Employees và EmployeeDetails bằng Batch Array Processing
  */
 function saveEmployeeDetail(details) {
+    var lock = LockService.getScriptLock();
     try {
-        var ss = getSpreadsheet();
+        lock.waitLock(10000);
         var employeeId = details.employeeId || details.id || '';
-        if (!employeeId) throw new Error('ID nhan su khong hop le. Kiem tra details.employeeId hoac details.id.');
+        if (!employeeId) throw new Error('ID nhân sự không hợp lệ. Kiểm tra details.employeeId hoặc details.id.');
 
-        // ---- 1. CAP NHAT BANG EMPLOYEES ----
-        var empSheet = ss.getSheetByName('Employees');
-        if (empSheet) {
-            var empData    = empSheet.getDataRange().getValues();
-            var empHeaders = empData[0].map(function(h) { return String(h).trim(); });
-            var empColMap  = {};
+        var empName = details.fullName || '';
+
+        // ---- 1. CAP NHAT BANG EMPLOYEES VỚI BATCH PROCESSING ----
+        var empRead = batchReadSheet('Employees');
+        if (empRead.sheet && empRead.data.length > 1) {
+            var empData = empRead.data;
+            var empHeaders = empRead.headers;
+            var empColMap = {};
             empHeaders.forEach(function(h, idx) { empColMap[h] = idx; });
 
             var empRowIdx = -1;
             for (var i = 1; i < empData.length; i++) {
-                if (String(empData[i][0]).trim() === employeeId) { empRowIdx = i + 1; break; }
+                if (String(empData[i][0]).trim() === employeeId) {
+                    empRowIdx = i;
+                    break;
+                }
             }
 
             if (empRowIdx !== -1) {
-                function updateEmpCell(colName, value) {
+                var row = empData[empRowIdx];
+
+                // Ghi vết JobHistory tự động nếu phát hiện thay đổi
+                var oldStatus = empColMap['Status'] !== undefined ? String(row[empColMap['Status']]).trim() : '';
+                var oldDept   = empColMap['Department'] !== undefined ? String(row[empColMap['Department']]).trim() : '';
+                var oldPos    = empColMap['Position'] !== undefined ? String(row[empColMap['Position']]).trim() : '';
+                var oldSalary = empColMap['BasicSalary'] !== undefined ? Number(row[empColMap['BasicSalary']]) || 0 : 0;
+
+                var newStatus = details.status !== undefined ? String(details.status).trim() : oldStatus;
+                var newDept   = details.department !== undefined ? String(details.department).trim() : oldDept;
+                var newPos    = details.position !== undefined ? String(details.position).trim() : oldPos;
+                var newSalary = details.basicSalary !== undefined ? Number(details.basicSalary) || 0 : oldSalary;
+
+                if (newStatus && oldStatus && newStatus !== oldStatus) {
+                    logJobHistory(employeeId, empName, 'StatusChange', oldStatus, newStatus, '', '', 'Thay đổi trạng thái nhân sự');
+                }
+                if (newDept && oldDept && newDept !== oldDept) {
+                    logJobHistory(employeeId, empName, 'Transferred', oldDept, newDept, '', '', 'Điều chuyển phòng ban');
+                }
+                if (newPos && oldPos && newPos !== oldPos) {
+                    logJobHistory(employeeId, empName, 'Promoted', oldPos, newPos, '', '', 'Thay đổi chức danh công tác');
+                }
+                if (newSalary !== oldSalary && oldSalary > 0) {
+                    logJobHistory(employeeId, empName, 'SalaryRaised', oldSalary, newSalary, '', '', 'Điều chỉnh mức lương cơ bản');
+                }
+
+                // Update row values in RAM
+                function setCell(colName, val) {
                     var idx = empColMap[colName];
-                    if (idx !== undefined && value !== undefined && value !== null) {
-                        empSheet.getRange(empRowIdx, idx + 1).setValue(value);
+                    if (idx !== undefined && val !== undefined && val !== null) {
+                        row[idx] = val;
                     }
                 }
-                updateEmpCell('FullName',           details.fullName);
-                updateEmpCell('Gender',             details.gender);
-                updateEmpCell('Email',              details.email);
-                updateEmpCell('Phone',              details.phone);
-                updateEmpCell('Department',         details.department);
-                updateEmpCell('Position',           details.position);
-                updateEmpCell('BasicSalary',        details.basicSalary ? Number(details.basicSalary) : 0);
-                updateEmpCell('ProbationSalary',    details.probationSalary ? Number(details.probationSalary) : 0);
-                updateEmpCell('Allowances',         details.allowances);
-                updateEmpCell('ProbationStartDate', details.probationStartDate);
-                updateEmpCell('OfficialStartDate',  details.officialStartDate);
-                updateEmpCell('ContractExpiryDate', details.contractExpiryDate);
-                updateEmpCell('Status',             details.status);
-                // Legacy compat + ContractType
-                updateEmpCell('ContractType', details.contractType);
-                updateEmpCell('StartDate',    details.officialStartDate || details.probationStartDate);
-                updateEmpCell('EndDate',      details.contractExpiryDate);
+
+                setCell('FullName',           details.fullName);
+                setCell('Gender',             details.gender);
+                setCell('Email',              details.email);
+                setCell('Phone',              details.phone);
+                setCell('Department',         details.department);
+                setCell('Position',           details.position);
+                setCell('BasicSalary',        details.basicSalary ? Number(details.basicSalary) : 0);
+                setCell('ProbationSalary',    details.probationSalary ? Number(details.probationSalary) : 0);
+                setCell('Allowances',         details.allowances);
+                setCell('ProbationStartDate', details.probationStartDate);
+                setCell('OfficialStartDate',  details.officialStartDate);
+                setCell('ContractExpiryDate', details.contractExpiryDate);
+                setCell('Status',             details.status);
+                setCell('ContractType',       details.contractType);
+                setCell('StartDate',          details.officialStartDate || details.probationStartDate);
+                setCell('EndDate',            details.contractExpiryDate);
+
+                empData[empRowIdx] = row;
+                batchWriteSheet('Employees', empData);
             }
         }
 
-        // ---- 2. CAP NHAT / TU KHAC PHUC BANG EMPLOYEEDETAILS ----
-        var detSheet = ss.getSheetByName('EmployeeDetails');
-        if (!detSheet) {
+        // ---- 2. CAP NHAT BANG EMPLOYEEDETAILS VỚI BATCH PROCESSING ----
+        var detRead = batchReadSheet('EmployeeDetails');
+        if (!detRead.sheet) {
             initializeDatabaseV2();
-            detSheet = ss.getSheetByName('EmployeeDetails');
+            detRead = batchReadSheet('EmployeeDetails');
         }
-        if (detSheet) {
-            var detData    = detSheet.getDataRange().getValues();
-            var detHeaders = detData[0].map(function(h) { return String(h).trim(); });
-            var detColMap  = {};
+
+        if (detRead.sheet) {
+            var detData = detRead.data;
+            var detHeaders = detRead.headers;
+            if (detData.length === 0) {
+                detData = [detHeaders];
+            }
+            var detColMap = {};
             detHeaders.forEach(function(h, idx) { detColMap[h] = idx; });
 
             var detRowIdx = -1;
             for (var i = 1; i < detData.length; i++) {
-                if (String(detData[i][0]).trim() === employeeId) { detRowIdx = i + 1; break; }
+                if (String(detData[i][0]).trim() === employeeId) {
+                    detRowIdx = i;
+                    break;
+                }
             }
 
-            // Self-healing: tu tao dong neu thieu
+            // Self-healing: Tạo mới dòng trong mảng RAM nếu thiếu
             if (detRowIdx === -1) {
                 var healRow = new Array(detHeaders.length).fill('');
                 if (detColMap['EmployeeID'] !== undefined) healRow[detColMap['EmployeeID']] = employeeId;
@@ -5040,45 +5392,45 @@ function saveEmployeeDetail(details) {
                 if (detColMap['Department'] !== undefined) healRow[detColMap['Department']] = details.department || '';
                 if (detColMap['Gender'] !== undefined)     healRow[detColMap['Gender']]     = details.gender || 'Nam';
                 if (detColMap['Docs'] !== undefined)       healRow[detColMap['Docs']]       = '[]';
-                detSheet.appendRow(healRow);
-                SpreadsheetApp.flush();
-                detData = detSheet.getDataRange().getValues();
-                for (var i = 1; i < detData.length; i++) {
-                    if (String(detData[i][0]).trim() === employeeId) { detRowIdx = i + 1; break; }
+                detData.push(healRow);
+                detRowIdx = detData.length - 1;
+            }
+
+            var detRow = detData[detRowIdx];
+            function setDetCell(colName, val) {
+                var idx = detColMap[colName];
+                if (idx !== undefined && val !== undefined && val !== null) {
+                    detRow[idx] = val;
                 }
             }
 
-            if (detRowIdx !== -1) {
-                function updateDetCell(colName, value) {
-                    var idx = detColMap[colName];
-                    if (idx !== undefined && value !== undefined && value !== null) {
-                        detSheet.getRange(detRowIdx, idx + 1).setValue(value);
-                    }
-                }
-                updateDetCell('FullName',                  details.fullName);
-                updateDetCell('Department',                details.department);
-                updateDetCell('Avatar',                    details.avatar);
-                updateDetCell('Gender',                    details.gender);
-                updateDetCell('BirthPlace',               details.birthPlace);
-                updateDetCell('CurrentAddress',           details.currentAddress);
-                updateDetCell('RegisterAddress',          details.registerAddress);
-                updateDetCell('IdentityCardNumber',       details.idCardNumber);
-                updateDetCell('IdentityCardDate',         details.idCardDate);
-                updateDetCell('IdentityCardPlace',        details.idCardPlace);
-                updateDetCell('AcademicLevel',            details.academicLevel);
-                updateDetCell('Specialization',           details.specialization);
-                updateDetCell('GraduationInstitution',    details.graduationInstitution);
-                updateDetCell('YouthUnionDate',           details.youthUnionDate);
-                updateDetCell('CommunistPartyDateStatus', details.communistPartyDateStatus);
-                updateDetCell('Docs',                     details.docs);
-                updateDetCell('DateOfBirth',              details.dob || details.dateOfBirth);
-            }
+            setDetCell('FullName',                  details.fullName);
+            setDetCell('Department',                details.department);
+            setDetCell('Avatar',                    details.avatar);
+            setDetCell('Gender',                    details.gender);
+            setDetCell('BirthPlace',               details.birthPlace);
+            setDetCell('CurrentAddress',           details.currentAddress);
+            setDetCell('RegisterAddress',          details.registerAddress);
+            setDetCell('IdentityCardNumber',       details.idCardNumber);
+            setDetCell('IdentityCardDate',         details.idCardDate);
+            setDetCell('IdentityCardPlace',        details.idCardPlace);
+            setDetCell('AcademicLevel',            details.academicLevel);
+            setDetCell('Specialization',           details.specialization);
+            setDetCell('GraduationInstitution',    details.graduationInstitution);
+            setDetCell('YouthUnionDate',           details.youthUnionDate);
+            setDetCell('CommunistPartyDateStatus', details.communistPartyDateStatus);
+            setDetCell('Docs',                     details.docs);
+            setDetCell('DateOfBirth',              details.dob || details.dateOfBirth);
+
+            detData[detRowIdx] = detRow;
+            batchWriteSheet('EmployeeDetails', detData);
         }
 
-        SpreadsheetApp.flush();
         return { success: true };
     } catch (e) {
         return { success: false, message: e.toString() };
+    } finally {
+        try { lock.releaseLock(); } catch(err) {}
     }
 }
 
