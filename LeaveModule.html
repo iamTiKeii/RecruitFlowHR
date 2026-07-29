@@ -1,0 +1,506 @@
+<!-- Leave & Overtime requests module component -->
+<div id="leave-requests-module" class="space-y-6 animate-fade-in" x-data="leaveState">
+  
+  <!-- Page Header -->
+  <div class="glass-card p-6 rounded-3xl border border-slate-800/80 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shadow-xl">
+    <div>
+      <div class="flex items-center gap-2">
+        <h2 class="text-xl font-extrabold text-white">Đăng ký & Phê duyệt Nghỉ phép / Tăng ca (OT)</h2>
+        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Time Off & Overtime</span>
+      </div>
+      <p class="text-xs text-slate-400 mt-1">Quản lý quỹ phép năm, nộp đơn xin nghỉ phép, đăng ký tăng ca và quy trình xét duyệt tự động</p>
+    </div>
+    
+    <!-- View Switcher Tabs (Leave vs OT) -->
+    <div class="flex bg-slate-900/90 p-1.5 rounded-2xl border border-slate-800 text-xs font-bold shadow-md">
+      <button @click="activeTab = 'leave'" :class="activeTab === 'leave' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'" class="px-5 py-2.5 rounded-xl transition-all cursor-pointer">
+        Nghỉ phép
+      </button>
+      <button @click="activeTab = 'ot'" :class="activeTab === 'ot' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-slate-200'" class="px-5 py-2.5 rounded-xl transition-all cursor-pointer">
+        Đăng ký Tăng ca (OT)
+      </button>
+    </div>
+  </div>
+
+  <!-- LEAVE SECTION -->
+  <div x-show="activeTab === 'leave'" class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    
+    <!-- Left Panel: Create Leave Request & Balance Widget -->
+    <div class="lg:col-span-1 space-y-6">
+      
+      <!-- Leave Balance Widget -->
+      <div class="glass-card p-6 rounded-3xl border border-indigo-500/30 shadow-xl space-y-4 relative overflow-hidden">
+        <div class="absolute -right-6 -bottom-6 w-32 h-32 bg-indigo-500/10 rounded-full blur-2xl pointer-events-none"></div>
+        <h3 class="text-xs font-extrabold uppercase tracking-wider text-indigo-300">Quỹ Phép Năm Cá Nhân</h3>
+        <div class="grid grid-cols-3 gap-3 text-center pt-1">
+          <div class="bg-slate-900/80 p-3 rounded-2xl border border-slate-800">
+            <p class="text-xl font-extrabold text-white" x-text="leaveBalance.total"></p>
+            <p class="text-[10px] text-slate-400 uppercase font-bold mt-0.5">Tổng phép</p>
+          </div>
+          <div class="bg-slate-900/80 p-3 rounded-2xl border border-slate-800">
+            <p class="text-xl font-extrabold text-amber-400" x-text="leaveBalance.used"></p>
+            <p class="text-[10px] text-slate-400 uppercase font-bold mt-0.5">Đã dùng</p>
+          </div>
+          <div class="bg-slate-900/80 p-3 rounded-2xl border border-slate-800">
+            <p class="text-xl font-extrabold text-emerald-400" x-text="leaveBalance.remaining"></p>
+            <p class="text-[10px] text-slate-400 uppercase font-bold mt-0.5">Còn lại</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Form: Create Leave Request -->
+      <div class="glass-card p-6 rounded-3xl border border-slate-800/80 space-y-4 shadow-xl">
+        <h3 class="text-sm font-bold text-white border-b border-slate-800 pb-3">Tạo Đơn xin nghỉ phép</h3>
+        
+        <div class="space-y-4 text-xs">
+          <div>
+            <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Loại phép nghỉ</label>
+            <select x-model="newRequest.leaveType" class="w-full px-4 py-3 rounded-xl glass-input bg-slate-900 font-semibold">
+              <option value="Nghỉ phép năm">Nghỉ phép năm (Trừ quỹ phép)</option>
+              <option value="Nghỉ ốm">Nghỉ ốm (Có giấy bác sĩ)</option>
+              <option value="Nghỉ thai sản">Nghỉ thai sản</option>
+              <option value="Nghỉ việc riêng">Nghỉ việc riêng (Hưởng lương/Không lương)</option>
+              <option value="Nghỉ không lương">Nghỉ không lương</option>
+            </select>
+          </div>
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Từ ngày</label>
+              <input type="date" x-model="newRequest.startDate" class="w-full px-4 py-3 rounded-xl glass-input font-mono">
+            </div>
+            <div>
+              <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Đến ngày</label>
+              <input type="date" x-model="newRequest.endDate" class="w-full px-4 py-3 rounded-xl glass-input font-mono">
+            </div>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Lý do xin nghỉ</label>
+            <textarea x-model="newRequest.reason" rows="3" placeholder="Nhập chi tiết lý do..." class="w-full px-4 py-3 rounded-xl glass-input"></textarea>
+          </div>
+          
+          <button @click="submitLeave" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/25 transition-all cursor-pointer">
+            Gửi Đơn xin nghỉ phép
+          </button>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right Panel: Inbox and History Logs -->
+    <div class="lg:col-span-2 space-y-6">
+      
+      <!-- Manager Pending Approvals Panel -->
+      <template x-if="role === 'Admin' || role === 'HR' || role === 'Manager'">
+        <div class="glass-card p-6 rounded-3xl border border-slate-800/80 space-y-4 shadow-xl">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 class="text-sm font-extrabold text-amber-400 flex items-center gap-2">
+              <span class="relative flex h-2.5 w-2.5">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-amber-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-amber-500"></span>
+              </span>
+              Hộp thư Phê duyệt Đơn xin Nghỉ phép
+            </h3>
+          </div>
+          
+          <div class="overflow-x-auto rounded-2xl border border-slate-800/80">
+            <table class="w-full text-left text-xs glass-table">
+              <thead>
+                <tr>
+                  <th class="p-4 font-bold text-slate-300 uppercase">Nhân viên</th>
+                  <th class="p-4 font-bold text-slate-300 uppercase">Loại phép</th>
+                  <th class="p-4 font-bold text-slate-300 uppercase">Khoảng ngày</th>
+                  <th class="p-4 font-bold text-slate-300 uppercase">Lý do</th>
+                  <th class="p-4 font-bold text-slate-300 uppercase text-center">Xử lý</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/50">
+                <template x-for="req in pendingRequests" :key="req.id">
+                  <tr class="hover:bg-slate-800/30 transition-colors">
+                    <td class="p-4">
+                      <p class="font-bold text-white" x-text="req.employeeName"></p>
+                      <p class="text-[10px] text-slate-400 font-mono" x-text="req.department"></p>
+                    </td>
+                    <td class="p-4 font-semibold text-indigo-300" x-text="req.leaveType"></td>
+                    <td class="p-4 font-mono" x-text="`Từ ${req.startDate} đến ${req.endDate}`"></td>
+                    <td class="p-4 text-slate-300" x-text="req.reason"></td>
+                    <td class="p-4">
+                      <div class="flex items-center justify-center gap-2">
+                        <button @click="processApproval(req.id, 'Approved')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-emerald-600/20">Duyệt</button>
+                        <button @click="processApproval(req.id, 'Rejected')" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-rose-600/20">Từ chối</button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+                <template x-if="pendingRequests.length === 0">
+                  <tr>
+                    <td colspan="5" class="p-6 text-center text-slate-400 italic">Không có đơn xin nghỉ phép nào đang chờ duyệt.</td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </template>
+
+      <!-- Leave Requests History -->
+      <div class="glass-card p-6 rounded-3xl border border-slate-800/80 space-y-4 shadow-xl">
+        <h3 class="text-sm font-bold text-white border-b border-slate-800 pb-3">Lịch sử Nghỉ phép</h3>
+        
+        <div class="overflow-x-auto rounded-2xl border border-slate-800/80">
+          <table class="w-full text-left text-xs glass-table">
+            <thead>
+              <tr>
+                <th class="p-4 font-bold text-slate-300 uppercase">Mã đơn</th>
+                <th class="p-4 font-bold text-slate-300 uppercase" x-show="role !== 'Employee'">Nhân viên</th>
+                <th class="p-4 font-bold text-slate-300 uppercase">Loại phép</th>
+                <th class="p-4 font-bold text-slate-300 uppercase">Khoảng ngày</th>
+                <th class="p-4 font-bold text-slate-300 uppercase">Lý do</th>
+                <th class="p-4 font-bold text-slate-300 uppercase">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/50">
+              <template x-for="req in historyRequests" :key="req.id">
+                <tr class="hover:bg-slate-800/30 transition-colors">
+                  <td class="p-4 font-bold text-indigo-400 font-mono" x-text="req.id"></td>
+                  <td class="p-4" x-show="role !== 'Employee'">
+                    <p class="font-bold text-white" x-text="req.employeeName"></p>
+                    <p class="text-[10px] text-slate-400 font-mono" x-text="req.employeeEmail"></p>
+                  </td>
+                  <td class="p-4 font-semibold text-slate-200" x-text="req.leaveType"></td>
+                  <td class="p-4 font-mono" x-text="`Từ ${req.startDate} đến ${req.endDate}`"></td>
+                  <td class="p-4 text-slate-300" x-text="req.reason"></td>
+                  <td class="p-4">
+                    <span x-show="req.status === 'Approved'" class="badge-suitable text-[10px] font-bold px-2.5 py-1 rounded-full">Đã phê duyệt</span>
+                    <span x-show="req.status === 'Rejected'" class="badge-cancelled text-[10px] font-bold px-2.5 py-1 rounded-full">Đã từ chối</span>
+                    <span x-show="req.status === 'Pending'" class="badge-pending text-[10px] font-bold px-2.5 py-1 rounded-full">Đang chờ duyệt</span>
+                  </td>
+                </tr>
+              </template>
+              <template x-if="historyRequests.length === 0">
+                <tr>
+                  <td :colspan="role === 'Employee' ? 5 : 6" class="p-6 text-center text-slate-400 italic">Không tìm thấy lịch sử đơn.</td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+    </div>
+
+  </div>
+
+  <!-- OVERTIME (OT) SECTION -->
+  <div x-show="activeTab === 'ot'" class="grid grid-cols-1 lg:grid-cols-3 gap-6" x-cloak>
+    
+    <!-- Left Panel: Create OT Request -->
+    <div class="lg:col-span-1 space-y-6">
+      <div class="glass-card p-6 rounded-3xl border border-slate-800/80 space-y-4 shadow-xl">
+        <h3 class="text-sm font-bold text-white border-b border-slate-800 pb-3">Đăng ký Tăng ca (OT)</h3>
+        
+        <div class="space-y-4 text-xs">
+          <div>
+            <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Ngày tăng ca</label>
+            <input type="date" x-model="newOt.date" class="w-full px-4 py-3 rounded-xl glass-input font-mono">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Số giờ OT</label>
+            <input type="number" min="0.5" step="0.5" x-model.number="newOt.hours" class="w-full px-4 py-3 rounded-xl glass-input font-bold">
+          </div>
+          <div>
+            <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Loại ngày tăng ca (Hệ số)</label>
+            <select x-model="newOt.otType" class="w-full px-4 py-3 rounded-xl glass-input bg-slate-900 font-semibold">
+              <option value="Ngày thường">Ngày thường (Hệ số 150%)</option>
+              <option value="Cuối tuần">Cuối tuần / Ngày nghỉ (Hệ số 200%)</option>
+              <option value="Ngày lễ">Ngày lễ / Tết (Hệ số 300%)</option>
+            </select>
+          </div>
+          <div>
+            <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Lý do & Nội dung công việc OT</label>
+            <textarea x-model="newOt.reason" rows="3" placeholder="Ghi rõ dự án, công việc cần hoàn thành..." class="w-full px-4 py-3 rounded-xl glass-input"></textarea>
+          </div>
+          
+          <button @click="submitOt" class="w-full py-3.5 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/25 transition-all cursor-pointer">
+            Gửi Đơn Đăng ký OT
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Right Panel: OT Approvals & History -->
+    <div class="lg:col-span-2 space-y-6">
+      
+      <!-- Manager Pending OT Approvals Panel -->
+      <template x-if="role === 'Admin' || role === 'HR' || role === 'Manager'">
+        <div class="glass-card p-6 rounded-3xl border border-slate-800/80 space-y-4 shadow-xl">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 class="text-sm font-extrabold text-indigo-400 flex items-center gap-2">
+              <span class="relative flex h-2.5 w-2.5">
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-indigo-400 opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2.5 w-2.5 bg-indigo-500"></span>
+              </span>
+              Hộp thư Phê duyệt Tăng ca (OT)
+            </h3>
+          </div>
+          
+          <div class="overflow-x-auto rounded-2xl border border-slate-800/80">
+            <table class="w-full text-left text-xs glass-table">
+              <thead>
+                <tr>
+                  <th class="p-4 font-bold text-slate-300 uppercase">Nhân viên</th>
+                  <th class="p-4 font-bold text-slate-300 uppercase">Ngày OT</th>
+                  <th class="p-4 font-bold text-slate-300 uppercase">Số giờ / Loại</th>
+                  <th class="p-4 font-bold text-slate-300 uppercase">Nội dung</th>
+                  <th class="p-4 font-bold text-slate-300 uppercase text-center">Xử lý</th>
+                </tr>
+              </thead>
+              <tbody class="divide-y divide-slate-800/50">
+                <template x-for="ot in pendingOtRequests" :key="ot.id">
+                  <tr class="hover:bg-slate-800/30 transition-colors">
+                    <td class="p-4">
+                      <p class="font-bold text-white" x-text="ot.employeeName"></p>
+                      <p class="text-[10px] text-slate-400 font-mono" x-text="ot.department"></p>
+                    </td>
+                    <td class="p-4 font-bold font-mono" x-text="ot.date"></td>
+                    <td class="p-4">
+                      <span class="font-bold text-indigo-400" x-text="`${ot.hours}h`"></span>
+                      <span class="text-[10px] text-slate-400" x-text="`(${ot.otType})`"></span>
+                    </td>
+                    <td class="p-4 text-slate-300" x-text="ot.reason"></td>
+                    <td class="p-4">
+                      <div class="flex items-center justify-center gap-2">
+                        <button @click="processOtApproval(ot.id, 'Approved')" class="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-emerald-600/20">Duyệt OT</button>
+                        <button @click="processOtApproval(ot.id, 'Rejected')" class="px-3 py-1.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold transition-all cursor-pointer shadow-md shadow-rose-600/20">Từ chối</button>
+                      </div>
+                    </td>
+                  </tr>
+                </template>
+                <template x-if="pendingOtRequests.length === 0">
+                  <tr>
+                    <td colspan="5" class="p-6 text-center text-slate-400 italic">Không có đơn OT nào đang chờ duyệt.</td>
+                  </tr>
+                </template>
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </template>
+
+      <!-- OT History -->
+      <div class="glass-card p-6 rounded-3xl border border-slate-800/80 space-y-4 shadow-xl">
+        <h3 class="text-sm font-bold text-white border-b border-slate-800 pb-3">Lịch sử Đăng ký Tăng ca</h3>
+        
+        <div class="overflow-x-auto rounded-2xl border border-slate-800/80">
+          <table class="w-full text-left text-xs glass-table">
+            <thead>
+              <tr>
+                <th class="p-4 font-bold text-slate-300 uppercase">Mã đơn</th>
+                <th class="p-4 font-bold text-slate-300 uppercase" x-show="role !== 'Employee'">Nhân viên</th>
+                <th class="p-4 font-bold text-slate-300 uppercase">Ngày OT</th>
+                <th class="p-4 font-bold text-slate-300 uppercase">Số giờ</th>
+                <th class="p-4 font-bold text-slate-300 uppercase">Nội dung</th>
+                <th class="p-4 font-bold text-slate-300 uppercase">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/50">
+              <template x-for="ot in historyOtRequests" :key="ot.id">
+                <tr class="hover:bg-slate-800/30 transition-colors">
+                  <td class="p-4 font-bold text-indigo-400 font-mono" x-text="ot.id"></td>
+                  <td class="p-4" x-show="role !== 'Employee'">
+                    <p class="font-bold text-white" x-text="ot.employeeName"></p>
+                    <p class="text-[10px] text-slate-400 font-mono" x-text="ot.employeeEmail"></p>
+                  </td>
+                  <td class="p-4 font-bold font-mono" x-text="ot.date"></td>
+                  <td class="p-4 font-bold text-white" x-text="`${ot.hours} giờ`"></td>
+                  <td class="p-4 text-slate-300" x-text="ot.reason"></td>
+                  <td class="p-4">
+                    <span x-show="ot.status === 'Approved'" class="badge-suitable text-[10px] font-bold px-2.5 py-1 rounded-full">Đã phê duyệt</span>
+                    <span x-show="ot.status === 'Rejected'" class="badge-cancelled text-[10px] font-bold px-2.5 py-1 rounded-full">Đã từ chối</span>
+                    <span x-show="ot.status === 'Pending'" class="badge-pending text-[10px] font-bold px-2.5 py-1 rounded-full">Đang chờ duyệt</span>
+                  </td>
+                </tr>
+              </template>
+              <template x-if="historyOtRequests.length === 0">
+                <tr>
+                  <td :colspan="role === 'Employee' ? 5 : 6" class="p-6 text-center text-slate-400 italic">Không tìm thấy lịch sử đăng ký OT.</td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  document.addEventListener('alpine:init', () => {
+    if (!Alpine.store('leaveStateRegistered')) {
+      Alpine.store('leaveStateRegistered', true);
+      
+      Alpine.data('leaveState', () => ({
+        activeTab: 'leave',
+        requests: [],
+        otRequests: [],
+        leaveBalance: {
+          total: 12,
+          used: 0,
+          remaining: 12
+        },
+        newRequest: {
+          leaveType: 'Nghỉ phép năm',
+          startDate: '',
+          endDate: '',
+          reason: '',
+          employeeEmail: ''
+        },
+        newOt: {
+          date: '',
+          hours: 2,
+          otType: 'Ngày thường',
+          reason: '',
+          employeeEmail: ''
+        },
+
+        init() {
+          this.loadData();
+          window.addEventListener('nav-changed', (e) => {
+            if (e.detail === 'leave-module') {
+              this.loadData();
+            }
+          });
+        },
+
+        loadData() {
+          const userStr = localStorage.getItem('recruitment_user');
+          if (!userStr) return;
+          const user = JSON.parse(userStr);
+          this.newRequest.employeeEmail = user.email || user.username;
+          this.newOt.employeeEmail = user.email || user.username;
+          
+          showLoading('Đang tải dữ liệu nghỉ phép & OT...');
+          
+          Promise.all([
+            runBackend('getLeaveRequests', user.email || user.username, user.role),
+            runBackend('getOtRequests', user.email || user.username, user.role),
+            runBackend('getEmployees')
+          ]).then(([leaveData, otData, empData]) => {
+            this.requests = leaveData || [];
+            this.otRequests = otData || [];
+            
+            if (empData && empData.length) {
+              const myEmp = empData.find(e => e.email.toLowerCase() === (user.email || user.username).toLowerCase());
+              if (myEmp) {
+                this.leaveBalance.total = myEmp.totalLeaveDays !== undefined ? myEmp.totalLeaveDays : 12;
+                this.leaveBalance.used = myEmp.usedLeaveDays || 0;
+                this.leaveBalance.remaining = Math.max(0, this.leaveBalance.total - this.leaveBalance.used);
+              }
+            }
+            hideLoading();
+          }).catch(err => {
+            hideLoading();
+            console.error("Error loading leave data:", err);
+          });
+        },
+
+        get pendingRequests() {
+          return this.requests.filter(r => r.status === 'Pending');
+        },
+
+        get historyRequests() {
+          return this.requests.filter(r => r.status !== 'Pending' || this.role === 'Employee');
+        },
+
+        get pendingOtRequests() {
+          return this.otRequests.filter(r => r.status === 'Pending');
+        },
+
+        get historyOtRequests() {
+          return this.otRequests.filter(r => r.status !== 'Pending' || this.role === 'Employee');
+        },
+
+        submitLeave() {
+          if (!this.newRequest.startDate || !this.newRequest.endDate) {
+            Swal.fire('Chú ý', 'Vui lòng chọn đầy đủ thời gian nghỉ phép.', 'warning');
+            return;
+          }
+          
+          showLoading('Đang gửi đơn xin nghỉ phép...');
+          runBackend('submitLeaveRequest', this.newRequest)
+            .then(res => {
+              hideLoading();
+              Swal.fire('Thành công', res.message || 'Đơn xin nghỉ phép của bạn đã được gửi cho Quản lý phê duyệt.', 'success');
+              this.newRequest.startDate = '';
+              this.newRequest.endDate = '';
+              this.newRequest.reason = '';
+              this.loadData();
+            })
+            .catch(err => {
+              hideLoading();
+              Swal.fire('Lỗi', 'Không thể gửi đơn nghỉ phép: ' + err.message, 'error');
+            });
+        },
+
+        processApproval(requestId, status) {
+          const userStr = localStorage.getItem('recruitment_user');
+          if (!userStr) return;
+          const user = JSON.parse(userStr);
+          
+          showLoading(status === 'Approved' ? 'Đang duyệt đơn...' : 'Đang từ chối đơn...');
+          runBackend('approveLeaveRequest', requestId, status, user.email || user.username)
+            .then(res => {
+              hideLoading();
+              Swal.fire('Thành công', status === 'Approved' ? 'Đã duyệt đơn nghỉ phép!' : 'Đã từ chối đơn nghỉ phép!', 'success');
+              this.loadData();
+            })
+            .catch(err => {
+              hideLoading();
+              Swal.fire('Lỗi', 'Không thể phê duyệt đơn: ' + err.message, 'error');
+            });
+        },
+
+        submitOt() {
+          if (!this.newOt.date || !this.newOt.hours || this.newOt.hours <= 0) {
+            Swal.fire('Chú ý', 'Vui lòng nhập ngày và số giờ tăng ca hợp lệ.', 'warning');
+            return;
+          }
+          
+          showLoading('Đang gửi đơn đăng ký OT...');
+          runBackend('submitOtRequest', this.newOt)
+            .then(res => {
+              hideLoading();
+              Swal.fire('Thành công', res.message || 'Đơn đăng ký tăng ca (OT) đã được gửi thành công.', 'success');
+              this.newOt.date = '';
+              this.newOt.hours = 2;
+              this.newOt.reason = '';
+              this.loadData();
+            })
+            .catch(err => {
+              hideLoading();
+              Swal.fire('Lỗi', 'Không thể gửi đơn OT: ' + err.message, 'error');
+            });
+        },
+
+        processOtApproval(requestId, status) {
+          const userStr = localStorage.getItem('recruitment_user');
+          if (!userStr) return;
+          const user = JSON.parse(userStr);
+          
+          showLoading('Đang cập nhật đơn OT...');
+          runBackend('approveOtRequest', requestId, status, user.email || user.username)
+            .then(res => {
+              hideLoading();
+              Swal.fire('Thành công', status === 'Approved' ? 'Đã phê duyệt đơn OT!' : 'Đã từ chối đơn OT!', 'success');
+              this.loadData();
+            })
+            .catch(err => {
+              hideLoading();
+              Swal.fire('Lỗi', 'Không thể xử lý đơn OT: ' + err.message, 'error');
+            });
+        }
+      }));
+    }
+  });
+</script>

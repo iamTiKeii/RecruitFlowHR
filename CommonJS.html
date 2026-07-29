@@ -1,0 +1,1685 @@
+<script>
+  // Global Candidates Data State
+  let allCandidates = [];
+  let currentFilter = 'All';
+  let systemConfigs = {};
+  let availableForms = [];
+
+  // Global Active Candidates State
+  let activeCandidate = null;
+  let activeRejectionStatus = 'Unsuitable';
+
+  // Quill Editor Instances & Initializer
+  let quillInterview = null;
+  let quillRejection = null;
+  let quillSuitablePreview = null;
+  let quillUnsuitablePreview = null;
+  let quillOfferPreview = null;
+  let quillPreviewEmailReader = null;
+
+  // Alpine.js App State Init
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('appState', () => ({
+      isLoggedIn: false,
+      role: '',
+      fullName: '',
+      email: '',
+      currentView: 'dashboard',
+      activeTab: 'recruitment',
+      activeSubTab: 'dashboard',
+      selectedEmployeeId: '',
+
+      viewEmployeeDetail(id) {
+        this.selectedEmployeeId = id;
+        localStorage.setItem('selected_employee_id', id);
+        navigateTo('employee-detail');
+      },
+
+      openAddEmployeeModal() {
+        window.dispatchEvent(new CustomEvent('open-employee-modal', { detail: { mode: 'add' } }));
+      },
+
+      openEditEmployeeModal(emp) {
+        window.dispatchEvent(new CustomEvent('open-employee-modal', { detail: { mode: 'edit', employee: emp } }));
+      },
+
+      init() {
+        const userStr = localStorage.getItem('recruitment_user');
+        if (userStr) {
+          const user = JSON.parse(userStr);
+          this.isLoggedIn = true;
+          this.role = user.role;
+          this.fullName = user.fullName;
+          this.email = user.email || user.username;
+          
+          if (this.role === 'Interviewer') {
+            this.activeTab = 'interviewer-dashboard';
+            this.activeSubTab = 'interviewer';
+          } else if (this.role === 'Employee' || this.role === 'Manager') {
+            this.activeTab = 'employee';
+            this.activeSubTab = 'profile';
+          } else {
+            this.activeTab = 'recruitment';
+            this.activeSubTab = 'dashboard';
+          }
+        }
+
+        // Try getting role automatically via active Google Session
+        runBackend('getCurrentUserRole')
+          .then(result => {
+            if (result && result.role) {
+              this.isLoggedIn = true;
+              this.role = result.role;
+              this.fullName = result.fullName;
+              this.email = result.email;
+
+              localStorage.setItem('recruitment_user', JSON.stringify({
+                username: result.email,
+                email: result.email,
+                fullName: result.fullName,
+                role: result.role
+              }));
+
+              // Navigation routing based on role
+              if (this.role === 'Interviewer') {
+                this.activeTab = 'interviewer-dashboard';
+                this.activeSubTab = 'interviewer';
+                navigateTo('interviewer-dashboard');
+              } else if (this.role === 'Employee' || this.role === 'Manager') {
+                this.activeTab = 'employee';
+                this.activeSubTab = 'profile';
+                navigateTo('employee-manager');
+              } else {
+                this.activeTab = 'recruitment';
+                this.activeSubTab = 'dashboard';
+                navigateTo('dashboard');
+              }
+            }
+          })
+          .catch(err => console.error("Error checking auto role:", err));
+      },
+
+      logout() {
+        this.isLoggedIn = false;
+        this.role = '';
+        this.fullName = '';
+        this.email = '';
+        this.currentView = 'dashboard';
+      }
+    }));
+  });
+
+  function initQuillEditors() {
+    if (window.quillInstancesInitialized) return;
+
+    const toolbarOptions = [
+      ['bold', 'italic', 'underline'],
+      [{ 'list': 'ordered' }, { 'list': 'bullet' }],
+      ['link'],
+      ['clean']
+    ];
+
+    const config = {
+      theme: 'snow',
+      modules: { toolbar: toolbarOptions }
+    };
+
+    if (document.getElementById('config-template-interview')) {
+      quillInterview = new Quill('#config-template-interview', config);
+    }
+    if (document.getElementById('config-template-rejection')) {
+      quillRejection = new Quill('#config-template-rejection', config);
+    }
+    if (document.getElementById('suitable-email-preview')) {
+      quillSuitablePreview = new Quill('#suitable-email-preview', config);
+    }
+    if (document.getElementById('unsuitable-email-preview')) {
+      quillUnsuitablePreview = new Quill('#unsuitable-email-preview', config);
+    }
+    if (document.getElementById('offer-email-preview')) {
+      quillOfferPreview = new Quill('#offer-email-preview', config);
+    }
+    if (document.getElementById('preview-email-body-display')) {
+      quillPreviewEmailReader = new Quill('#preview-email-body-display', {
+        theme: 'snow',
+        readOnly: true,
+        modules: { toolbar: false }
+      });
+    }
+
+    window.quillInstancesInitialized = true;
+  }
+
+  function syncThemeSwitcherIcons() {
+    const isDark = document.documentElement.classList.contains('dark');
+    const sunIcon = document.getElementById('theme-icon-sun');
+    const moonIcon = document.getElementById('theme-icon-moon');
+    if (sunIcon && moonIcon) {
+      if (isDark) {
+        sunIcon.classList.remove('hidden');
+        moonIcon.classList.add('hidden');
+      } else {
+        sunIcon.classList.add('hidden');
+        moonIcon.classList.remove('hidden');
+      }
+    }
+  }
+
+  function toggleTheme() {
+    const isDark = document.documentElement.classList.contains('dark');
+    if (isDark) {
+      document.documentElement.classList.remove('dark');
+      localStorage.setItem('theme', 'light');
+    } else {
+      document.documentElement.classList.add('dark');
+      localStorage.setItem('theme', 'dark');
+    }
+    syncThemeSwitcherIcons();
+  }
+
+  // Global Translation Dictionary
+  const i18n = {
+    vi: {
+      "nav-dashboard": "Bảng điều khiển",
+      "nav-scanner": "Quét Email",
+      "nav-candidates": "Ứng viên",
+      "nav-settings": "Cài đặt",
+      "nav-forms": "Biểu mẫu khảo sát",
+      "logout": "Đăng xuất",
+      "title-connected": "Đã kết nối với Database",
+      // Dashboard
+      "dash-title": "Tiến trình tuyển dụng",
+      "dash-subtitle": "Quét hồ sơ ứng tuyển từ Gmail, lưu CV trên Drive, quản lý phỏng vấn và gửi thư thông báo.",
+      "dash-trend-title": "Xu hướng hồ sơ",
+      "dash-trend-subtitle": "Số lượng hồ sơ nhận theo ngày (15 ngày qua)",
+      "dash-unprocessed": "Hộp thư chưa xử lý",
+      "dash-candidates": "Ứng viên",
+      "dash-scan-btn": "Quét Email",
+      "dash-cand-btn": "Danh sách ứng viên",
+      "stat-total-title": "Tổng ứng viên",
+      "stat-suitable-title": "Ứng viên phù hợp",
+      "stat-interviews-title": "Đang phỏng vấn",
+      "stat-unsuitable-title": "Ứng viên không đạt",
+      // Scanner
+      "scan-title": "Gmail CV Scanner",
+      "scan-subtitle": "Quét tệp đính kèm trong thư Gmail, lọc trùng lặp và lưu trữ ứng viên vào database.",
+      "scan-lbl-keyword": "Từ khóa tìm kiếm (Tiêu đề Gmail)",
+      "scan-lbl-start": "Ngày bắt đầu",
+      "scan-lbl-end": "Ngày kết thúc",
+      "scan-duplicate-tip": "Bỏ qua trùng lặp dựa trên Email & Thời gian nhận thư.",
+      "scan-btn-execute": "Bắt đầu quét & nhập",
+      "scan-summary-title": "Kết quả quét & nhập",
+      "scan-summary-subtitle": "Chi tiết kết quả thực thi quét trong lượt này.",
+      "scan-clear-btn": "Xóa kết quả",
+      "scan-total-checked": "Tìm thấy",
+      "scan-imported-title": "Đã nhập mới",
+      "scan-skipped-title": "Trùng lặp",
+      "scan-result-list": "Hồ sơ ứng viên vừa nhập",
+      "table-th-id": "Mã số",
+      "table-th-cand": "Ứng viên",
+      "table-th-subject": "Tiêu đề / Vị trí",
+      "table-th-date": "Ngày nhận thư",
+      "table-th-cv": "Tệp CV",
+      "view-attachment": "Xem CV",
+      "no-attachment": "Không đính kèm",
+      "scan-empty-msg": "Không có email ứng viên mới nào khớp với bộ lọc.",
+      // Candidates
+      "cand-search-placeholder": "Tìm kiếm tên, email, tiêu đề...",
+      "cand-th-actions": "Thao tác",
+      "cand-btn-suitable": "Phù hợp",
+      "cand-btn-unsuitable": "Không đạt",
+      "cand-status-new": "Mới nhận",
+      "cand-status-suitable": "Đang phỏng vấn",
+      "cand-status-unsuitable": "Không đạt",
+      "cand-preview-title": "Xem trước tài liệu",
+      "cand-no-preview": "Không có tệp hiển thị xem trước.",
+      "cand-open-drive": "Mở bằng Google Drive",
+      // Modals
+      "modal-int-title": "Lên lịch hẹn phỏng vấn",
+      "modal-int-date": "Ngày & Giờ phỏng vấn",
+      "modal-int-loc": "Địa điểm / Meeting link",
+      "modal-int-note": "Ghi chú đính kèm gửi ứng viên",
+      "modal-int-cancel": "Hủy bỏ",
+      "modal-int-submit": "Xác nhận & Gửi thư mời",
+      "modal-rej-title": "Gửi thông báo từ chối",
+      "modal-rej-canned": "Lý do mẫu thường dùng",
+      "modal-rej-custom": "Chi tiết phản hồi lý do",
+      "modal-rej-cancel": "Hủy bỏ",
+      "modal-rej-submit": "Xác nhận & Gửi thư từ chối",
+      // Settings
+      "settings-title": "Thiết lập hệ thống",
+      "settings-subtitle": "Cài đặt thư mục Drive, lọc email quét và các mẫu nội dung thư tự động gửi.",
+      "settings-btn-sheet": "Mở Spreadsheet",
+      "settings-btn-folder": "Mở thư mục Drive",
+      "settings-lbl-folder": "Google Drive Folder ID (Lưu CV)",
+      "settings-lbl-target-email": "Email đích cần quét (Lọc theo email nhận)",
+      "settings-lbl-keyword": "Từ khóa tìm kiếm mặc định",
+      "settings-lbl-temp-int": "Mẫu thư mời phỏng vấn",
+      "settings-lbl-temp-rej": "Mẫu thư từ chối ứng tuyển",
+      "settings-btn-reset": "Thiết lập lại Database",
+      "settings-btn-save": "Lưu cài đặt cấu hình",
+      "settings-pw-title": "Đổi mật khẩu bảo mật",
+      "settings-pw-old": "Mật khẩu cũ",
+      "settings-pw-new": "Mật khẩu mới",
+      "settings-pw-confirm": "Xác nhận mật khẩu mới",
+      "settings-pw-submit": "Cập nhật mật khẩu",
+      "guide-btn": "Xem hướng dẫn lấy Drive ID",
+      // Guide Modal
+      "guide-title": "Hướng dẫn lấy Google Drive Folder ID",
+      "guide-p1": "1. Truy cập vào tài khoản Google Drive của bạn.",
+      "guide-p2": "2. Tạo một thư mục mới (ví dụ: 'Recruitment CVs') hoặc mở thư mục sẵn có.",
+      "guide-p3": "3. Nhìn lên thanh địa chỉ của trình duyệt, đường dẫn thư mục sẽ có cấu trúc:",
+      "guide-p4": "4. Sao chép (copy) toàn bộ chuỗi ký tự ngẫu nhiên nằm ở phía sau chữ",
+      "guide-p5": "(đó chính là ID thư mục của bạn).",
+      "guide-p6": "5. Dán ID vừa copy vào ô thiết lập 'Google Drive Folder ID' và chọn Lưu cài đặt.",
+      "guide-close": "Đóng lại"
+    },
+    en: {
+      "nav-dashboard": "Dashboard",
+      "nav-scanner": "Scan Email",
+      "nav-candidates": "Candidates",
+      "nav-settings": "Settings",
+      "nav-forms": "Google Forms",
+      "logout": "Logout",
+      "title-connected": "Connected to Database",
+      // Dashboard
+      "dash-title": "Recruitment Pipeline",
+      "dash-subtitle": "Scan candidate applications from Gmail, organize CVs on Drive, and track interview status.",
+      "dash-trend-title": "Application Trend",
+      "dash-trend-subtitle": "Daily candidate files scanned (Last 15 days)",
+      "dash-unprocessed": "Unprocessed \"New\" Inbox",
+      "dash-candidates": "Candidates",
+      "dash-scan-btn": "Scan Emails",
+      "dash-cand-btn": "Candidates",
+      "stat-total-title": "Total Candidates",
+      "stat-suitable-title": "Suitable Candidates",
+      "stat-interviews-title": "Interviews",
+      "stat-unsuitable-title": "Unsuitable Candidates",
+      // Scanner
+      "scan-title": "Gmail CV Scanner",
+      "scan-subtitle": "Scan attachments directly from Gmail and import candidate metadata.",
+      "scan-lbl-keyword": "Search Keyword (Gmail Subject)",
+      "scan-lbl-start": "Start Date",
+      "scan-lbl-end": "End Date",
+      "scan-duplicate-tip": "Duplicates skipped automatically based on Email & Timestamp.",
+      "scan-btn-execute": "Start Scanning & Import",
+      "scan-summary-title": "Scan Execution Summary",
+      "scan-summary-subtitle": "Overview of candidates processed during this session.",
+      "scan-clear-btn": "Clear Results",
+      "scan-total-checked": "Total Found",
+      "scan-imported-title": "Imported",
+      "scan-skipped-title": "Duplicates",
+      "scan-result-list": "Imported Candidates",
+      "table-th-id": "ID",
+      "table-th-cand": "Candidate",
+      "table-th-subject": "Subject / Position",
+      "table-th-date": "Received Date",
+      "table-th-cv": "CV File",
+      "view-attachment": "View CV",
+      "no-attachment": "No Attachment",
+      "scan-empty-msg": "No new candidates matching current filters were found in your inbox.",
+      // Candidates
+      "cand-search-placeholder": "Search name, email, subject...",
+      "cand-th-actions": "Actions",
+      "cand-btn-suitable": "Suitable",
+      "cand-btn-unsuitable": "Unsuitable",
+      "cand-status-new": "New",
+      "cand-status-suitable": "Suitable",
+      "cand-status-unsuitable": "Unsuitable",
+      "cand-preview-title": "Document Preview",
+      "cand-no-preview": "No document preview available.",
+      "cand-open-drive": "Open in Google Drive",
+      // Modals
+      "modal-int-title": "Schedule Interview",
+      "modal-int-date": "Interview Date & Time",
+      "modal-int-loc": "Location / Meeting link",
+      "modal-int-note": "Notes for Candidate",
+      "modal-int-cancel": "Cancel",
+      "modal-int-submit": "Confirm & Send Invitation",
+      "modal-rej-title": "Send Rejection Feedback",
+      "modal-rej-canned": "Common Canned Reasons",
+      "modal-rej-custom": "Rejection Feedback details",
+      "modal-rej-cancel": "Cancel",
+      "modal-rej-submit": "Confirm & Send Email",
+      // Settings
+      "settings-title": "System Configurations",
+      "settings-subtitle": "Configure Drive folder, target scanning email, and automated templates.",
+      "settings-btn-sheet": "Open Spreadsheet",
+      "settings-btn-folder": "Drive Uploads Folder",
+      "settings-lbl-folder": "Google Drive Folder ID (CVs)",
+      "settings-lbl-target-email": "Target Scan Email (Optional inbox filter)",
+      "settings-lbl-keyword": "Default Keyword Config",
+      "settings-lbl-temp-int": "Email Template: Interview Invitation",
+      "settings-lbl-temp-rej": "Email Template: Application Rejection",
+      "settings-btn-reset": "Reinitialize Spreadsheet",
+      "settings-btn-save": "Save Configurations",
+      "settings-pw-title": "Change Account Password",
+      "settings-pw-old": "Current Password",
+      "settings-pw-new": "New Password",
+      "settings-pw-confirm": "Confirm New Password",
+      "settings-pw-submit": "Update Password",
+      "guide-btn": "Show Guide to Get Drive ID",
+      // Guide Modal
+      "guide-title": "How to Get Drive Folder ID",
+      "guide-p1": "1. Access your Google Drive account.",
+      "guide-p2": "2. Create a new folder (e.g. 'Recruitment CVs') or open an existing one.",
+      "guide-p3": "3. Look at your browser address bar. The URL resembles:",
+      "guide-p4": "4. Copy the entire alphanumeric string of letters and numbers after",
+      "guide-p5": "(this is your Folder ID).",
+      "guide-p6": "5. Paste this code into settings and select Save.",
+      "guide-close": "Close Guide"
+    }
+  };
+
+  /**
+   * Set and apply language localization to DOM
+   */
+  function setLanguage(lang) {
+    localStorage.setItem('recruitment_lang', lang);
+
+    const btnVi = document.getElementById('lang-vi');
+    const btnEn = document.getElementById('lang-en');
+    if (lang === 'vi') {
+      if (btnVi) {
+        btnVi.className = "px-2.5 py-1 rounded-lg text-[10px] font-black tracking-wider transition-all uppercase bg-indigo-600 text-white shadow-sm shadow-indigo-600/10";
+      }
+      if (btnEn) {
+        btnEn.className = "px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wider transition-all uppercase text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white";
+      }
+    } else {
+      if (btnEn) {
+        btnEn.className = "px-2.5 py-1 rounded-lg text-[10px] font-black tracking-wider transition-all uppercase bg-indigo-600 text-white shadow-sm shadow-indigo-600/10";
+      }
+      if (btnVi) {
+        btnVi.className = "px-2.5 py-1 rounded-lg text-[10px] font-bold tracking-wider transition-all uppercase text-slate-400 dark:text-slate-500 hover:text-slate-900 dark:hover:text-white";
+      }
+    }
+
+    const elements = document.querySelectorAll('[data-i18n]');
+    elements.forEach(el => {
+      const key = el.getAttribute('data-i18n');
+      if (i18n[lang] && i18n[lang][key]) {
+        if (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA') {
+          el.setAttribute('placeholder', i18n[lang][key]);
+        } else {
+          el.textContent = i18n[lang][key];
+        }
+      }
+    });
+
+    const pageTitleMap = {
+      'dashboard': lang === 'vi' ? 'Bảng điều khiển tuyển dụng' : 'Recruitment Dashboard',
+      'scanner': lang === 'vi' ? 'Quét hồ sơ từ Gmail' : 'Scan Gmail CVs',
+      'candidates': lang === 'vi' ? 'Quản lý ứng viên' : 'Candidates Management',
+      'settings': lang === 'vi' ? 'Cấu hình hệ thống' : 'Configuration Settings',
+      'forms': lang === 'vi' ? 'Quản lý biểu mẫu' : 'Survey Forms Management'
+    };
+
+    const titleEl = document.getElementById('current-view-title');
+    let activePage = 'dashboard';
+    ['dashboard', 'scanner', 'candidates', 'settings', 'forms'].forEach(p => {
+      const pageEl = document.getElementById('page-' + p);
+      if (pageEl && !pageEl.classList.contains('hidden')) {
+        activePage = p;
+      }
+    });
+    if (titleEl && pageTitleMap[activePage]) {
+      titleEl.textContent = pageTitleMap[activePage];
+    }
+  }
+
+  /**
+   * SPA Navigation Router
+   */
+  function navigateTo(pageName) {
+    let targetTab = 'recruitment';
+    let targetSubTab = 'dashboard';
+
+    if (pageName === 'dashboard') {
+      targetTab = 'recruitment';
+      targetSubTab = 'dashboard';
+    } else if (pageName === 'scanner') {
+      targetTab = 'recruitment';
+      targetSubTab = 'scanner';
+    } else if (pageName === 'candidates') {
+      targetTab = 'recruitment';
+      targetSubTab = 'candidates';
+    } else if (pageName === 'forms') {
+      targetTab = 'recruitment';
+      targetSubTab = 'forms';
+    } else if (pageName === 'employee-manager') {
+      targetTab = 'employee';
+      targetSubTab = 'profile';
+    } else if (pageName === 'attendance') {
+      targetTab = 'attendance';
+      targetSubTab = 'logs';
+    } else if (pageName === 'leave-module') {
+      targetTab = 'attendance';
+      targetSubTab = 'leave';
+    } else if (pageName === 'payroll') {
+      targetTab = 'payroll';
+      targetSubTab = 'calculator';
+    } else if (pageName === 'settings') {
+      targetTab = 'settings';
+      targetSubTab = 'config';
+    } else if (pageName === 'category-manager') {
+      targetTab = 'settings';
+      targetSubTab = 'categories';
+    } else if (pageName === 'print-templates') {
+      targetTab = 'settings';
+      targetSubTab = 'print-templates';
+    } else if (pageName === 'user-manager') {
+      targetTab = 'settings';
+      targetSubTab = 'users';
+    } else if (pageName === 'employee-detail') {
+      targetTab = 'employee';
+      targetSubTab = 'detail';
+    } else if (pageName === 'interviewer-dashboard') {
+      targetTab = 'interviewer-dashboard';
+      targetSubTab = 'interviewer';
+    }
+
+    // Sync view with Alpine state
+    if (window.Alpine) {
+      const app = document.body && Alpine.$data(document.body);
+      if (app) {
+        app.currentView = pageName;
+        app.activeTab = targetTab;
+        app.activeSubTab = targetSubTab;
+      }
+    }
+
+    const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+    setLanguage(currentLang);
+
+    if (pageName === 'dashboard') {
+      loadDashboardReports();
+    } else if (pageName === 'candidates') {
+      loadCandidatesTable();
+    } else if (pageName === 'settings') {
+      loadSettingsForm();
+    } else if (pageName === 'forms') {
+      loadFormsList();
+    } else if (pageName === 'interviewer-dashboard') {
+      if (typeof loadInterviewerCandidates === 'function') {
+        loadInterviewerCandidates();
+      }
+    } else if (['employee-manager', 'attendance', 'leave-module', 'payroll', 'employee-detail', 'print-templates', 'user-manager'].includes(pageName)) {
+      window.dispatchEvent(new CustomEvent('nav-changed', { detail: pageName }));
+    }
+  }
+
+  /**
+   * Promisified wrapper for Google Apps Script server calls
+   */
+  function runBackend(funcName, ...args) {
+    return new Promise((resolve, reject) => {
+      google.script.run
+        .withSuccessHandler(resolve)
+        .withFailureHandler(err => {
+          console.error('Backend error in ' + funcName + ':', err);
+          reject(err);
+        })[funcName](...args);
+    });
+  }
+
+  /**
+   * UI Loading Overlay Control
+   */
+  function showLoading(text = 'Processing request...') {
+    const overlay = document.getElementById('loadingOverlay');
+    const textEl = document.getElementById('loadingText');
+    if (overlay && textEl) {
+      textEl.innerText = text;
+      overlay.classList.remove('hidden');
+      setTimeout(() => {
+        overlay.classList.remove('opacity-0');
+        overlay.classList.add('opacity-100');
+      }, 10);
+    }
+  }
+
+  function hideLoading() {
+    const overlay = document.getElementById('loadingOverlay');
+    if (overlay) {
+      overlay.classList.remove('opacity-100');
+      overlay.classList.add('opacity-0');
+      setTimeout(() => {
+        overlay.classList.add('hidden');
+      }, 300);
+    }
+  }
+
+  /**
+   * Toast Notifications Engine
+   */
+  function showToast(message, type = 'success') {
+    const container = document.getElementById('toastContainer');
+    if (!container) return;
+
+    const toast = document.createElement('div');
+    toast.className = 'flex items-center gap-3 px-4 py-3 rounded-lg shadow-xl border text-sm font-medium transition-all duration-300 transform translate-y-4 opacity-0 max-w-sm';
+
+    let bg, border, text, icon;
+    if (type === 'success') {
+      bg = 'bg-emerald-950/80';
+      border = 'border-emerald-500/30';
+      text = 'text-emerald-300';
+      icon = '<svg class="w-5 h-5 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+    } else if (type === 'error') {
+      bg = 'bg-rose-950/80';
+      border = 'border-rose-500/30';
+      text = 'text-rose-300';
+      icon = '<svg class="w-5 h-5 text-rose-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10 14l2-2m0 0l2-2m-2 2l-2-2m2 2l2 2m7-2a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg>';
+    } else {
+      bg = 'bg-amber-950/80';
+      border = 'border-amber-500/30';
+      text = 'text-amber-300';
+      icon = '<svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>';
+    }
+
+    toast.classList.add(bg, border, text);
+    toast.innerHTML = icon + '<div class="flex-1">' + message + '</div><button class="text-slate-400 hover:text-slate-200" onclick="this.parentElement.remove()"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg></button>';
+
+    container.appendChild(toast);
+
+    setTimeout(() => {
+      toast.classList.remove('translate-y-4', 'opacity-0');
+      toast.classList.add('translate-y-0', 'opacity-100');
+    }, 10);
+
+    setTimeout(() => {
+      toast.classList.remove('translate-y-0', 'opacity-100');
+      toast.classList.add('translate-y-4', 'opacity-0');
+      setTimeout(() => {
+        toast.remove();
+      }, 300);
+    }, 4000);
+  }
+
+  /**
+   * Dual-Column CV and Candidate Details Preview Modal
+   */
+  function previewCvSaved(candId) {
+    const userStr = localStorage.getItem('recruitment_user');
+    if (!userStr) return;
+    const user = JSON.parse(userStr);
+
+    showLoading('Đang tải hồ sơ ứng viên...');
+    
+    // Validate interviewer access rights dynamically via backend
+    runBackend('getCandidateCVUrlOrBase64', candId, user.email)
+      .then(res => {
+        hideLoading();
+        let cand = allCandidates.find(c => c.id === candId);
+        if (!cand) {
+          cand = currentScanResults.find(c => c.id === candId);
+        }
+        if (!cand) return;
+        activeCandidate = cand;
+        openPreviewModal();
+      })
+      .catch(err => {
+        hideLoading();
+        showToast('Không có quyền xem: ' + err.message, 'error');
+      });
+  }
+
+  function openPreviewModal() {
+    if (!activeCandidate) return;
+
+    // Fill editable inputs on the left side
+    document.getElementById('preview-input-name').value = activeCandidate.senderName || '';
+    document.getElementById('preview-input-dob').value = activeCandidate.dateOfBirth || '';
+    document.getElementById('preview-input-subject').value = activeCandidate.subject || '';
+    document.getElementById('preview-input-phone').value = activeCandidate.phoneNumber || '';
+    
+    const emailInput = document.getElementById('preview-input-email');
+    emailInput.value = activeCandidate.senderEmail || '';
+    emailInput.dataset.candId = activeCandidate.id;
+
+    // Load original candidate email cover text into read-only preview Quill
+    if (quillPreviewEmailReader) {
+      quillPreviewEmailReader.root.innerHTML = '';
+      if (activeCandidate.emailContent) {
+        quillPreviewEmailReader.root.innerHTML = activeCandidate.emailContent;
+      } else if (activeCandidate.htmlBody) {
+        quillPreviewEmailReader.root.innerHTML = activeCandidate.htmlBody;
+      } else if (activeCandidate.plainBody) {
+        quillPreviewEmailReader.root.innerHTML = activeCandidate.plainBody;
+      } else {
+        quillPreviewEmailReader.root.innerHTML = '<p class="text-slate-400 italic">Đang tải thư của ứng viên...</p>';
+        runBackend('getEmailPlainBody', activeCandidate.id)
+          .then(bodyText => {
+            activeCandidate.emailContent = bodyText || "Không tìm thấy nội dung email.";
+            if (activeCandidate.id === emailInput.dataset.candId) {
+              quillPreviewEmailReader.root.innerHTML = activeCandidate.emailContent;
+            }
+          })
+          .catch(err => {
+            quillPreviewEmailReader.root.innerHTML = '<p class="text-rose-400 italic">Lỗi tải nội dung email: ' + err.message + '</p>';
+          });
+      }
+    }
+
+    // Classify actions buttons display
+    const previewBtnSuitable = document.getElementById('preview-btn-suitable');
+    const previewBtnUnsuitable = document.getElementById('preview-btn-unsuitable');
+    if (previewBtnSuitable && previewBtnUnsuitable) {
+      if (activeCandidate.status && activeCandidate.status !== 'New') {
+        previewBtnSuitable.classList.add('hidden');
+        previewBtnUnsuitable.classList.add('hidden');
+      } else {
+        previewBtnSuitable.classList.remove('hidden');
+        previewBtnUnsuitable.classList.remove('hidden');
+      }
+    }
+
+    // Load PDF preview iframe on the right side
+    const iframe = document.getElementById('cv-iframe');
+    const noPreview = document.getElementById('cv-no-preview');
+    const downloadBtn = document.getElementById('preview-download-btn');
+    const url = activeCandidate.cvLink || '';
+
+    downloadBtn.href = url;
+
+    const match = url.match(/\/file\/d\/([a-zA-Z0-9_-]+)/);
+    if (match && match[1]) {
+      iframe.src = 'https://drive.google.com/file/d/' + match[1] + '/preview';
+      iframe.classList.remove('hidden');
+      noPreview.classList.add('hidden');
+    } else {
+      iframe.src = '';
+      iframe.classList.add('hidden');
+      noPreview.classList.remove('hidden');
+    }
+
+    // Show modal
+    document.getElementById('modal-preview-cv').classList.remove('hidden');
+  }
+
+  function closeCvPreview() {
+    document.getElementById('modal-preview-cv').classList.add('hidden');
+    document.getElementById('cv-iframe').src = '';
+    if (quillPreviewEmailReader) {
+      quillPreviewEmailReader.root.innerHTML = '';
+    }
+    activeCandidate = null;
+  }
+
+  /**
+   * Save changes from Details Form back into activeCandidate (updates Google Sheets immediately)
+   */
+  function savePreviewInfo() {
+    if (!activeCandidate) return;
+
+    const name = document.getElementById('preview-input-name').value.trim();
+    const dob = document.getElementById('preview-input-dob').value;
+    const subject = document.getElementById('preview-input-subject').value.trim();
+    const phone = document.getElementById('preview-input-phone').value.trim();
+    const email = document.getElementById('preview-input-email').value.trim();
+
+    activeCandidate.senderName = name;
+    activeCandidate.dateOfBirth = dob;
+    activeCandidate.subject = subject;
+    activeCandidate.phoneNumber = phone;
+    activeCandidate.senderEmail = email;
+
+    const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+
+    showLoading(currentLang === 'vi' ? 'Đang cập nhật cơ sở dữ liệu...' : 'Updating database...');
+    runBackend('updateCandidateDetails', activeCandidate)
+      .then(() => {
+        hideLoading();
+        showToast(currentLang === 'vi' ? 'Đã lưu thay đổi ứng viên!' : 'Candidate details updated!', 'success');
+
+        // Refresh local views
+        if (typeof loadCandidatesTable === 'function') {
+          loadCandidatesTable();
+        }
+
+        // Update scanned row if present in Scanner View
+        const row = document.querySelector('[data-scan-row-id="' + activeCandidate.id + '"]');
+        if (row) {
+          row.querySelector('.font-bold.text-white').textContent = name;
+          row.querySelector('.text-slate-400.mt-0.5.font-mono').textContent = email;
+          const subCell = row.querySelector('.text-slate-200.font-medium');
+          if (subCell) {
+            subCell.textContent = subject;
+            subCell.setAttribute('title', subject);
+          }
+        }
+
+        closeCvPreview();
+      })
+      .catch(err => {
+        hideLoading();
+        showToast('Failed to save details: ' + err.message, 'error');
+      });
+  }
+
+  /**
+   * Quick Classify directly from the preview CV modal
+   */
+  function previewClassify(status) {
+    if (!activeCandidate) return;
+
+    // First save the current input values to activeCandidate
+    activeCandidate.senderName = document.getElementById('preview-input-name').value.trim();
+    activeCandidate.dateOfBirth = document.getElementById('preview-input-dob').value;
+    activeCandidate.subject = document.getElementById('preview-input-subject').value.trim();
+    activeCandidate.phoneNumber = document.getElementById('preview-input-phone').value.trim();
+    activeCandidate.senderEmail = document.getElementById('preview-input-email').value.trim();
+
+    // Close preview window (keep activeCandidate state)
+    document.getElementById('modal-preview-cv').classList.add('hidden');
+    document.getElementById('cv-iframe').src = '';
+
+    const id = activeCandidate.id;
+    if (status === 'Suitable') {
+      openSuitableModal(id);
+    } else {
+      openUnsuitableModal(id);
+    }
+  }
+
+  /**
+   * Classification Modal triggers
+   */
+  function openSuitableModal(candidateId) {
+    if (!activeCandidate || activeCandidate.id !== candidateId) {
+      let cand = allCandidates.find(c => c.id === candidateId);
+      if (!cand) {
+        cand = currentScanResults.find(c => c.id === candidateId);
+      }
+      if (cand) {
+        activeCandidate = cand;
+      }
+    }
+
+    const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+    document.getElementById('suitable-cand-id').value = candidateId;
+    document.getElementById('interview-date').value = '';
+    document.getElementById('interview-location').value = 'Google Meet';
+    document.getElementById('interview-note').value = currentLang === 'vi'
+      ? 'Chúng tôi mong muốn được trao đổi thêm cùng bạn.'
+      : 'We look forward to speaking with you.';
+
+    // Check if candidate is already invited (sentInviteAt is not empty)
+    const isInvited = activeCandidate && activeCandidate.sentInviteAt && activeCandidate.sentInviteAt.trim() !== '';
+    const warningBanner = document.getElementById('invited-warning-banner');
+    const sendEmailCheckbox = document.getElementById('planning-send-email-checkbox');
+    const emailPreviewWrapper = document.getElementById('planning-email-preview-wrapper');
+
+    if (isInvited) {
+      if (warningBanner) warningBanner.classList.remove('hidden');
+      if (sendEmailCheckbox) {
+        sendEmailCheckbox.checked = false;
+        sendEmailCheckbox.disabled = true; // prevent resending
+      }
+      if (emailPreviewWrapper) emailPreviewWrapper.classList.add('hidden');
+    } else {
+      if (warningBanner) warningBanner.classList.add('hidden');
+      if (sendEmailCheckbox) {
+        sendEmailCheckbox.checked = true;
+        sendEmailCheckbox.disabled = false;
+      }
+      if (emailPreviewWrapper) emailPreviewWrapper.classList.remove('hidden');
+    }
+
+    // Populate interviewers select from backend
+    const intSelect = document.getElementById('interview-interviewer-select');
+    intSelect.innerHTML = '<option value="">-- Chọn Người phỏng vấn --</option>';
+
+    runBackend('getInterviewers')
+      .then(interviewers => {
+        interviewers.forEach(interviewer => {
+          const opt = document.createElement('option');
+          opt.value = interviewer.email;
+          opt.textContent = interviewer.fullName + ' (' + interviewer.email + ')';
+          intSelect.appendChild(opt);
+        });
+
+        // Select interviewer if already assigned
+        if (activeCandidate && activeCandidate.assignedInterviewer) {
+          intSelect.value = activeCandidate.assignedInterviewer;
+        }
+      })
+      .catch(err => console.error("Failed to load interviewers:", err));
+
+    const formSelect = document.getElementById('suitable-form-select');
+    formSelect.innerHTML = '<option value="">-- Không đính kèm form / No Form --</option>';
+    availableForms = [];
+
+    runBackend('getAllForms')
+      .then(forms => {
+        availableForms = forms;
+        forms.forEach(f => {
+          const opt = document.createElement('option');
+          opt.value = f.id;
+          opt.textContent = f.name;
+          formSelect.appendChild(opt);
+        });
+
+        if (activeCandidate && activeCandidate.assignedFormId) {
+          formSelect.value = activeCandidate.assignedFormId;
+        }
+
+        document.getElementById('modal-suitable').classList.remove('hidden');
+        generateEmailPreview('interview');
+      })
+      .catch(err => {
+        console.error("Failed to load forms for select:", err);
+        document.getElementById('modal-suitable').classList.remove('hidden');
+        generateEmailPreview('interview');
+      });
+  }
+
+  function togglePlanningEmailField() {
+    const isChecked = document.getElementById('planning-send-email-checkbox').checked;
+    const wrapper = document.getElementById('planning-email-preview-wrapper');
+    if (wrapper) {
+      if (isChecked) {
+        wrapper.classList.remove('hidden');
+      } else {
+        wrapper.classList.add('hidden');
+      }
+    }
+  }
+
+  function generateMeetLinkForPlanning() {
+    const intDate = document.getElementById('interview-date').value;
+    const candId = document.getElementById('suitable-cand-id').value;
+    const cand = activeCandidate || allCandidates.find(c => c.id === candId);
+
+    if (!intDate) {
+      showToast('Vui lòng chọn ngày giờ phỏng vấn trước khi tạo link Google Meet.', 'warning');
+      return;
+    }
+    if (!cand) return;
+
+    const startTime = new Date(intDate);
+    const endTime = new Date(startTime.getTime() + 60 * 60 * 1000); // 1 hour duration
+
+    showLoading('Đang tạo link Google Meet qua Google Calendar API...');
+
+    runBackend('createMeetLink', startTime.toISOString(), endTime.toISOString(), cand.senderEmail, cand.senderName, cand.subject)
+      .then(res => {
+        hideLoading();
+        if (res && res.meetLink) {
+          document.getElementById('interview-location').value = res.meetLink;
+          showToast('Tạo link Google Meet thành công!', 'success');
+          generateEmailPreview('interview');
+        } else {
+          showToast('Không lấy được link Google Meet từ sự kiện Calendar.', 'error');
+        }
+      })
+      .catch(err => {
+        hideLoading();
+        showToast('Lỗi tạo link Meet: ' + err.message, 'error');
+      });
+  }
+
+  function submitSuitablePlanning() {
+    const id = document.getElementById('suitable-cand-id').value;
+    const interviewerEmail = document.getElementById('interview-interviewer-select').value;
+    const interviewDate = document.getElementById('interview-date').value;
+    const meetLink = document.getElementById('interview-location').value.trim();
+    const sendEmail = document.getElementById('planning-send-email-checkbox').checked;
+    const emailBody = (typeof quillSuitablePreview !== 'undefined' && quillSuitablePreview)
+      ? quillSuitablePreview.root.innerHTML
+      : document.getElementById('suitable-email-preview').innerHTML;
+
+    const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+
+    if (!interviewerEmail) {
+      showToast('Vui lòng chọn Người phỏng vấn.', 'warning');
+      return;
+    }
+    if (!interviewDate) {
+      showToast('Vui lòng chọn Ngày giờ phỏng vấn.', 'warning');
+      return;
+    }
+
+    closeModal('suitable');
+    showLoading('Đang lưu thông tin Planning lịch phỏng vấn...');
+
+    const formattedDate = new Date(interviewDate).toLocaleString(currentLang === 'vi' ? 'vi-VN' : 'en-US');
+
+    runBackend('saveInterviewPlanning', id, interviewerEmail, formattedDate, meetLink, sendEmail, emailBody)
+      .then(res => {
+        hideLoading();
+        showToast('Lưu lịch phỏng vấn và gán Interviewer thành công!', 'success');
+
+        // Refresh candidates table
+        if (typeof loadCandidatesTable === 'function') {
+          loadCandidatesTable();
+        }
+        activeCandidate = null;
+      })
+      .catch(err => {
+        hideLoading();
+        showToast('Lỗi lưu lịch phỏng vấn: ' + err.message, 'error');
+        activeCandidate = null;
+      });
+  }
+
+  function openUnsuitableModal(candidateId, intendedStatus) {
+    activeRejectionStatus = intendedStatus || 'Unsuitable';
+    if (!activeCandidate || activeCandidate.id !== candidateId) {
+      let cand = allCandidates.find(c => c.id === candidateId);
+      if (!cand) {
+        cand = currentScanResults.find(c => c.id === candidateId);
+      }
+      if (cand) {
+        activeCandidate = cand;
+      }
+    }
+
+    const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+    document.getElementById('unsuitable-cand-id').value = candidateId;
+    document.getElementById('rejection-templates-select').value = '';
+    document.getElementById('rejection-reason').value = '';
+
+    const reasonsMap = {
+      vi: {
+        default: '-- Chọn hoặc điền bên dưới --',
+        tech: 'Yêu cầu công nghệ chưa khớp',
+        exp: 'Thiếu số năm kinh nghiệm',
+        loc: 'Ràng buộc địa lý',
+        budget: 'Vượt ngân sách vị trí',
+        polite: 'Chọn hồ sơ phù hợp hơn (Lịch sự)'
+      },
+      en: {
+        default: '-- Select or write below --',
+        tech: 'Technical Stack Mismatch',
+        exp: 'Experience Level Insufficient',
+        loc: 'Location Constraint',
+        budget: 'Budget Mismatch',
+        polite: 'General Mismatch (Polite)'
+      }
+    };
+
+    const optDefault = document.querySelector('#rejection-templates-select .lang-option-default');
+    const optTech = document.querySelector('#rejection-templates-select .lang-option-tech');
+    const optExp = document.querySelector('#rejection-templates-select .lang-option-exp');
+    const optLoc = document.querySelector('#rejection-templates-select .lang-option-loc');
+    const optBudget = document.querySelector('#rejection-templates-select .lang-option-budget');
+    const optPolite = document.querySelector('#rejection-templates-select .lang-option-polite');
+
+    optDefault.textContent = reasonsMap[currentLang].default;
+    optTech.textContent = reasonsMap[currentLang].tech;
+    optExp.textContent = reasonsMap[currentLang].exp;
+    optLoc.textContent = reasonsMap[currentLang].loc;
+    optBudget.textContent = reasonsMap[currentLang].budget;
+    optPolite.textContent = reasonsMap[currentLang].polite;
+
+    const viVals = {
+      tech: "Hồ sơ chưa phù hợp với yêu cầu công nghệ của dự án hiện tại.",
+      exp: "Số năm kinh nghiệm làm việc thương mại thực tế chưa đạt yêu cầu tối thiểu.",
+      loc: "Công ty chưa hỗ trợ các yêu cầu làm việc từ xa hoàn toàn hoặc hỗ trợ trợ cấp relocation.",
+      budget: "Mức đề xuất chế độ đãi ngộ vượt khung ngân sách cho phép của vị trí tuyển dụng này.",
+      polite: "Công ty đã ưu tiên chọn các hồ sơ có mức độ tương thích sát hơn trong giai đoạn này."
+    };
+    const enVals = {
+      tech: "Does not match required technical stack requirements.",
+      exp: "Insufficient years of relevant commercial development experience.",
+      loc: "Unable to support remote/hybrid location or relocation requests.",
+      budget: "Expected compensation packages exceed the budgeted bracket for this opening.",
+      polite: "Other options with closer alignment were prioritized at this time."
+    };
+
+    const targetVals = currentLang === 'vi' ? viVals : enVals;
+    optTech.value = targetVals.tech;
+    optExp.value = targetVals.exp;
+    optLoc.value = targetVals.loc;
+    optBudget.value = targetVals.budget;
+    optPolite.value = targetVals.polite;
+
+    document.getElementById('modal-unsuitable').classList.remove('hidden');
+    generateEmailPreview('rejection');
+  }
+
+  function closeModal(type) {
+    document.getElementById('modal-' + type).classList.add('hidden');
+    activeCandidate = null;
+  }
+
+  function applyCannedReason() {
+    const select = document.getElementById('rejection-templates-select');
+    const reasonText = document.getElementById('rejection-reason');
+    reasonText.value = select.value;
+  }
+
+  function formatCurrencyInput(inputElement) {
+    let value = inputElement.value;
+    value = value.replace(/\D/g, "");
+    if (!value) {
+      inputElement.value = "";
+      return;
+    }
+    inputElement.value = Number(value).toLocaleString('en-US');
+  }
+
+  function syncCurrencies(selectedVal) {
+    document.getElementById('offer-currency-gross').value = selectedVal;
+    document.getElementById('offer-currency-net').value = selectedVal;
+    document.getElementById('offer-currency-probation').value = selectedVal;
+  }
+
+  function viewEmailContent(candidateId, source) {
+    let cand = null;
+    if (source === 'scan') {
+      cand = currentScanResults.find(c => c.id === candidateId);
+    } else {
+      cand = allCandidates.find(c => c.id === candidateId);
+    }
+
+    if (!cand) return;
+
+    const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+    const senderLabel = currentLang === 'vi' ? 'Người gửi' : 'Sender';
+    const subjectLabel = currentLang === 'vi' ? 'Tiêu đề' : 'Subject';
+    const dateLabel = currentLang === 'vi' ? 'Ngày nhận' : 'Date';
+
+    const populateModal = (bodyText) => {
+      const senderInfoEl = document.getElementById('email-content-sender-info');
+      const bodyDisplayEl = document.getElementById('email-content-body-display');
+
+      if (senderInfoEl) {
+        senderInfoEl.innerHTML = `
+          <div><strong>${senderLabel}:</strong> ${cand.senderName || ""} &lt;${cand.senderEmail || ""}&gt;</div>
+          <div><strong>${subjectLabel}:</strong> ${cand.subject || ""}</div>
+          <div><strong>${dateLabel}:</strong> ${cand.receivedDate || ""}</div>
+        `;
+      }
+
+      if (bodyDisplayEl) {
+        bodyDisplayEl.textContent = bodyText || "";
+      }
+
+      document.getElementById('modal-view-email-content').classList.remove('hidden');
+    };
+
+    if (cand.plainBody) {
+      populateModal(cand.plainBody);
+    } else {
+      showLoading(currentLang === 'vi' ? 'Đang tải nội dung email...' : 'Loading email content...');
+      runBackend('getEmailPlainBody', cand.id)
+        .then(bodyText => {
+          hideLoading();
+          cand.plainBody = bodyText || "No content found.";
+          populateModal(cand.plainBody);
+        })
+        .catch(err => {
+          hideLoading();
+          showToast('Failed to load email: ' + err.message, 'error');
+        });
+    }
+  }
+
+  /**
+   * Generates email preview dynamically with resolved keys
+   */
+  function generateEmailPreview(type) {
+    if (!activeCandidate) return;
+    const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+
+    if (type === 'interview') {
+      const template = systemConfigs.template_interview || '';
+      const intDateRaw = document.getElementById('interview-date').value;
+      const intDateFormatted = intDateRaw ? new Date(intDateRaw).toLocaleString(currentLang === 'vi' ? 'vi-VN' : 'en-US') : '';
+      const intLoc = document.getElementById('interview-location').value;
+      const intNote = document.getElementById('interview-note').value;
+      const selectedFormId = document.getElementById('suitable-form-select').value;
+
+      let formLinkText = "";
+      if (selectedFormId) {
+        const foundForm = availableForms.find(f => f.id === selectedFormId);
+        if (foundForm && foundForm.publishedUrl) {
+          formLinkText = "<br><br>Vui lòng điền thông tin khảo sát trước buổi phỏng vấn tại đường dẫn sau / Please fill this survey before the interview: <a href='" + foundForm.publishedUrl + "'>" + foundForm.publishedUrl + "</a>";
+        }
+      }
+
+      let emailBody = template;
+      emailBody = emailBody.replace(/\{\{name\}\}/g, activeCandidate.senderName || '');
+      emailBody = emailBody.replace(/\{\{subject\}\}/g, activeCandidate.subject || '');
+      emailBody = emailBody.replace(/\{\{interview_date\}\}/g, intDateFormatted);
+      emailBody = emailBody.replace(/\{\{location\}\}/g, intLoc);
+      emailBody = emailBody.replace(/\{\{note\}\}/g, intNote);
+      emailBody = emailBody.replace(/\{\{company_name\}\}/g, systemConfigs.company_name || '');
+      emailBody = emailBody.replace(/\{\{company_address\}\}/g, systemConfigs.company_address || '');
+      emailBody = emailBody.replace(/\{\{company_phone\}\}/g, systemConfigs.company_phone || '');
+
+      if (formLinkText) {
+        emailBody += formLinkText;
+      }
+
+      if (typeof quillSuitablePreview !== 'undefined' && quillSuitablePreview) {
+        quillSuitablePreview.root.innerHTML = emailBody;
+      } else {
+        document.getElementById('suitable-email-preview').innerHTML = emailBody;
+      }
+    } else if (type === 'rejection') {
+      const template = systemConfigs.template_rejection || '';
+      const rejReason = document.getElementById('rejection-reason').value;
+
+      let emailBody = template;
+      emailBody = emailBody.replace(/\{\{name\}\}/g, activeCandidate.senderName || '');
+      emailBody = emailBody.replace(/\{\{subject\}\}/g, activeCandidate.subject || '');
+      emailBody = emailBody.replace(/\{\{rejection_reason\}\}/g, rejReason);
+      emailBody = emailBody.replace(/\{\{company_name\}\}/g, systemConfigs.company_name || '');
+      emailBody = emailBody.replace(/\{\{company_address\}\}/g, systemConfigs.company_address || '');
+      emailBody = emailBody.replace(/\{\{company_phone\}\}/g, systemConfigs.company_phone || '');
+
+      if (typeof quillUnsuitablePreview !== 'undefined' && quillUnsuitablePreview) {
+        quillUnsuitablePreview.root.innerHTML = emailBody;
+      } else {
+        document.getElementById('unsuitable-email-preview').innerHTML = emailBody;
+      }
+    } else if (type === 'offer') {
+      const template = "Dear {{name}},<br><br>We are delighted to offer you employment at our company for the {{subject}} position. Please see the attached PDF offer letter for details:<br>- Start Date: {{start_date}}<br>- Location: {{location}}<br>- Offer Expiry: {{expiry_date}}<br>- Gross Salary: {{gross}} {{currency}}<br>- Probation Salary: {{probation}} {{currency}}<br><br>Best regards,<br>{{company_name}} HR Team";
+      const gross = document.getElementById('offer-gross').value;
+      const probation = document.getElementById('offer-probation').value;
+      const currency = document.getElementById('offer-currency-gross').value;
+      const startDate = document.getElementById('offer-start-date').value;
+      const loc = document.getElementById('offer-location').value;
+      const expiry = document.getElementById('offer-expiry-date').value;
+
+      let emailBody = template;
+      emailBody = emailBody.replace(/\{\{name\}\}/g, activeCandidate.senderName || '');
+      emailBody = emailBody.replace(/\{\{subject\}\}/g, activeCandidate.subject || '');
+      emailBody = emailBody.replace(/\{\{start_date\}\}/g, startDate || '');
+      emailBody = emailBody.replace(/\{\{location\}\}/g, loc || '');
+      emailBody = emailBody.replace(/\{\{expiry_date\}\}/g, expiry || '');
+      emailBody = emailBody.replace(/\{\{gross\}\}/g, gross || '');
+      emailBody = emailBody.replace(/\{\{probation\}\}/g, probation || '');
+      emailBody = emailBody.replace(/\{\{currency\}\}/g, currency || '');
+      emailBody = emailBody.replace(/\{\{company_name\}\}/g, systemConfigs.company_name || '');
+
+      if (typeof quillOfferPreview !== 'undefined' && quillOfferPreview) {
+        quillOfferPreview.root.innerHTML = emailBody;
+      } else {
+        document.getElementById('offer-email-preview').innerHTML = emailBody;
+      }
+    }
+  }
+
+  /**
+   * Updates scanned temporary row status dynamically in-place
+   */
+  function updateScannedRowDOM(id, status, extraText) {
+    const row = document.querySelector('[data-scan-row-id="' + id + '"]');
+    if (!row) return;
+    const actionsCell = row.querySelector('.actions-cell');
+    if (actionsCell) {
+      if (status === 'Suitable') {
+        actionsCell.innerHTML = '<span class="text-[10px] text-slate-500 font-semibold italic bg-slate-900 border border-slate-800 px-2 py-1 rounded-lg">Date: ' + extraText + '</span>';
+      } else {
+        actionsCell.innerHTML = '<span class="text-[10px] text-rose-400/70 font-semibold italic bg-rose-950/20 border border-rose-900/30 px-2 py-1 rounded-lg max-w-[180px] truncate block" title="' + extraText + '">Reason: ' + extraText + '</span>';
+      }
+    }
+  }
+
+  /**
+   * Updates matching database table rows in-place
+   */
+  function updateCandidateRowDOM(id, status, extraData) {
+    const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+    const rows = document.querySelectorAll('[data-cand-row-id="' + id + '"]');
+
+    rows.forEach(row => {
+      // Update Status Badge
+      const badgeCell = row.querySelector('.status-cell');
+      if (badgeCell) {
+        let badgeClass = 'badge-new';
+        let statusLabel = status;
+
+        if (status === 'Suitable') {
+          badgeClass = 'badge-suitable';
+          statusLabel = currentLang === 'vi' ? 'Phù hợp' : 'Suitable';
+        } else if (status === 'Unsuitable') {
+          badgeClass = 'badge-unsuitable';
+          statusLabel = currentLang === 'vi' ? 'Không đạt' : 'Unsuitable';
+        } else {
+          statusLabel = currentLang === 'vi' ? 'Mới nhận' : 'New';
+        }
+        badgeCell.innerHTML = '<span class="px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ' + badgeClass + '">' + statusLabel + '</span>';
+      }
+
+      // Update Action buttons cell
+      const actionsCell = row.querySelector('.actions-cell');
+      if (actionsCell) {
+        const isDriveLink = row.getAttribute('data-cv-link') && row.getAttribute('data-cv-link').startsWith('http');
+        const previewLabel = currentLang === 'vi' ? 'Xem trước' : 'Preview CV';
+        const reasonLabel = currentLang === 'vi' ? 'Lý do' : 'Reason';
+
+        const cvButtonHTML = isDriveLink
+          ? '<button onclick="previewCvSaved(\'' + id + '\')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/25 text-indigo-400 font-semibold transition-colors"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.43 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>' + previewLabel + '</button>'
+          : '<span class="text-slate-500 italic">' + row.getAttribute('data-cv-link') + '</span>';
+
+        const currentFormId = (extraData && extraData.formId) || row.getAttribute('data-assigned-form-id') || '';
+        if (currentFormId) {
+          row.setAttribute('data-assigned-form-id', currentFormId);
+        }
+
+        let formResponseBtn = '';
+        if (currentFormId && currentFormId.trim() !== '') {
+          const email = row.getAttribute('data-sender-email') || '';
+          formResponseBtn = '<button onclick="viewCandidateFormResponse(\'' + email + '\', \'' + currentFormId + '\')" class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-indigo-500/10 hover:bg-indigo-500/20 border border-indigo-500/25 text-indigo-400 font-semibold transition-colors">Xem Form</button>';
+        }
+
+        let resultHTML = '';
+        if (status === 'Suitable') {
+          resultHTML = '<span class="text-[10px] text-slate-500 font-semibold italic bg-slate-900 border border-slate-800 px-2 py-1 rounded-lg">Date: ' + extraData.interviewDate + '</span>';
+        } else if (status === 'Unsuitable') {
+          resultHTML = '<span class="text-[10px] text-rose-400/70 font-semibold italic bg-rose-950/20 border border-rose-900/30 px-2 py-1 rounded-lg max-w-[180px] truncate block" title="' + extraData.rejectionReason + '">' + reasonLabel + ': ' + extraData.rejectionReason + '</span>';
+        }
+
+        actionsCell.innerHTML = '<div class="flex items-center justify-end gap-2.5">' + cvButtonHTML + formResponseBtn + resultHTML + '</div>';
+      }
+    });
+
+    // Sync in memory state too
+    const matched = allCandidates.find(c => c.id === id);
+    if (matched) {
+      matched.status = status;
+      if (extraData && extraData.formId) {
+        matched.assignedFormId = extraData.formId;
+      }
+      if (status === 'Suitable') {
+        matched.interviewInfo = "Date: " + extraData.interviewDate;
+      } else if (status === 'Unsuitable') {
+        matched.rejectionReason = extraData.rejectionReason;
+      }
+    }
+  }
+
+  /**
+   * Form Actions Submit (Updates existant record)
+   */
+  function submitSuitable() {
+    const id = document.getElementById('suitable-cand-id').value;
+    const interviewDate = document.getElementById('interview-date').value;
+    const location = document.getElementById('interview-location').value.trim();
+    const note = document.getElementById('interview-note').value.trim();
+    const emailBody = (typeof quillSuitablePreview !== 'undefined' && quillSuitablePreview)
+      ? quillSuitablePreview.root.innerHTML
+      : document.getElementById('suitable-email-preview').innerHTML;
+    const formId = document.getElementById('suitable-form-select').value;
+    const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+
+    if (!interviewDate) {
+      const errDate = currentLang === 'vi' ? 'Vui lòng điền ngày và giờ phỏng vấn.' : 'Interview date & time is required.';
+      showToast(errDate, 'error');
+      return;
+    }
+
+    closeModal('suitable');
+
+    const loadMsg = currentLang === 'vi'
+      ? 'Đang lên lịch phỏng vấn và gửi thư mời...'
+      : 'Scheduling interview and sending invitation email...';
+    showLoading(loadMsg);
+
+    const formattedDate = new Date(interviewDate).toLocaleString(currentLang === 'vi' ? 'vi-VN' : 'en-US');
+
+    runBackend('updateCandidateStatus', id, 'Suitable', {
+      interviewDate: formattedDate,
+      location: location,
+      note: note,
+      emailBody: emailBody,
+      formId: formId
+    })
+      .then(res => {
+        hideLoading();
+        const successMsg = currentLang === 'vi' ? 'Đã lên lịch hẹn phỏng vấn thành công!' : 'Candidate scheduled successfully!';
+        showToast(successMsg, 'success');
+
+        // Update both view list DOM states in-place
+        updateCandidateRowDOM(id, 'Suitable', { interviewDate: formattedDate });
+        updateScannedRowDOM(id, 'Suitable', formattedDate);
+
+        activeCandidate = null;
+      })
+      .catch(err => {
+        hideLoading();
+        showToast('Failed: ' + err.message, 'error');
+        activeCandidate = null;
+      });
+  }
+
+  function submitUnsuitable() {
+    const id = document.getElementById('unsuitable-cand-id').value;
+    const reason = document.getElementById('rejection-reason').value.trim();
+    const emailBody = (typeof quillUnsuitablePreview !== 'undefined' && quillUnsuitablePreview)
+      ? quillUnsuitablePreview.root.innerHTML
+      : document.getElementById('unsuitable-email-preview').innerHTML;
+    const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+    const targetStatus = activeRejectionStatus || 'Unsuitable';
+
+    if (!reason) {
+      const errReason = currentLang === 'vi' ? 'Vui lòng cung cấp chi tiết lý do từ chối.' : 'Rejection reason feedback is required.';
+      showToast(errReason, 'error');
+      return;
+    }
+
+    closeModal('unsuitable');
+
+    const loadMsg = currentLang === 'vi'
+      ? 'Đang cập nhật hồ sơ và gửi email phản hồi...'
+      : 'Marking candidate and emailing rejection...';
+    showLoading(loadMsg);
+
+    runBackend('updateCandidateStatus', id, targetStatus, {
+      rejectionReason: reason,
+      emailBody: emailBody
+    })
+      .then(res => {
+        hideLoading();
+        const successMsg = currentLang === 'vi' ? 'Đã cập nhật trạng thái và gửi email từ chối.' : 'Candidate updated and rejection email sent.';
+        showToast(successMsg, 'success');
+
+        // Update both view list DOM states in-place
+        updateCandidateRowDOM(id, targetStatus, { rejectionReason: reason });
+        updateScannedRowDOM(id, targetStatus, reason);
+
+        activeCandidate = null;
+      })
+      .catch(err => {
+        hideLoading();
+        showToast('Failed: ' + err.message, 'error');
+        activeCandidate = null;
+      });
+  }
+
+  /**
+   * Load System configuration settings globally on bootstrap
+   */
+  function loadSystemConfigs() {
+    runBackend('getConfig')
+      .then(config => {
+        systemConfigs = config;
+      })
+      .catch(err => console.error('Failed to load configs:', err));
+  }
+
+  /**
+   * View candidate form responses details modal trigger
+   */
+  function viewCandidateFormResponse(email, formId) {
+    const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+    showLoading(currentLang === 'vi' ? 'Đang truy vấn phản hồi khảo sát...' : 'Retrieving form response...');
+
+    runBackend('getCandidateFormResponse', email, formId)
+      .then(response => {
+        hideLoading();
+        const contentDiv = document.getElementById('form-response-content');
+        contentDiv.innerHTML = '';
+
+        if (!response) {
+          contentDiv.innerHTML = '<p class="text-slate-400 italic text-center py-4">Ứng viên chưa hoàn thành khảo sát này. / Candidate has not responded yet.</p>';
+        } else {
+          for (const key in response) {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'border-b border-slate-800/50 pb-2.5';
+            wrapper.innerHTML = '<p class="font-semibold text-indigo-400 mb-1">' + key + '</p>' +
+              '<p class="text-slate-200 font-mono break-all">' + (response[key] || 'n/a') + '</p>';
+            contentDiv.appendChild(wrapper);
+          }
+        }
+
+        document.getElementById('modal-view-form-response').classList.remove('hidden');
+      })
+      .catch(err => {
+        hideLoading();
+        showToast('Failed to load response: ' + err.message, 'error');
+      });
+  }
+
+  function closeFormResponseModal() {
+    document.getElementById('modal-view-form-response').classList.add('hidden');
+  }
+
+  function changeCandidateStatus(candidateId, newStatus) {
+    let cand = allCandidates.find(c => c.id === candidateId);
+    if (!cand) {
+      cand = currentScanResults.find(c => c.id === candidateId);
+    }
+
+    if (newStatus === 'Suitable' || newStatus === 'Pending') {
+      openSuitableModal(candidateId);
+    } else if (newStatus === 'Passed') {
+      openOfferModal(candidateId);
+    } else if (newStatus === 'Failed') {
+      openUnsuitableModal(candidateId);
+    } else {
+      const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+      showLoading(currentLang === 'vi' ? 'Đang cập nhật trạng thái...' : 'Updating status...');
+
+      runBackend('updateCandidateStatus', candidateId, newStatus, null)
+        .then(() => {
+          hideLoading();
+          showToast(currentLang === 'vi' ? 'Cập nhật trạng thái thành công!' : 'Status updated successfully!', 'success');
+          loadCandidatesTable();
+        })
+        .catch(err => {
+          hideLoading();
+          showToast('Failed to update status: ' + err.message, 'error');
+          loadCandidatesTable();
+        });
+    }
+  }
+
+  /**
+   * Populates and triggers Offer Modal
+   */
+  function openOfferModal(candidateId) {
+    let cand = allCandidates.find(c => c.id === candidateId);
+    if (!cand) {
+      cand = currentScanResults.find(c => c.id === candidateId);
+    }
+    if (!cand) return;
+    activeCandidate = cand;
+
+    document.getElementById('offer-cand-id').value = candidateId;
+
+    // Process and show Interviewer recommendations if available in evaluationHistory
+    const recCard = document.getElementById('interviewer-recommendation-card');
+    const recSalary = document.getElementById('recommend-salary');
+    const recStartDate = document.getElementById('recommend-start-date');
+    const recNotes = document.getElementById('recommend-notes');
+
+    let matchedRec = null;
+    if (cand.evaluationHistory) {
+      try {
+        const history = JSON.parse(cand.evaluationHistory);
+        if (Array.isArray(history) && history.length > 0) {
+          // Find the latest Passed evaluation or fallback to latest evaluation
+          matchedRec = history.filter(h => h.status === 'Passed').reverse()[0] || history[history.length - 1];
+        }
+      } catch (e) {
+        console.error("Error parsing evaluationHistory:", e);
+      }
+    }
+
+    if (matchedRec) {
+      if (recCard) recCard.classList.remove('hidden');
+      if (recSalary) recSalary.textContent = matchedRec.salary ? matchedRec.salary + ' VND' : 'N/A';
+      if (recStartDate) recStartDate.textContent = matchedRec.startDate || 'N/A';
+      if (recNotes) recNotes.textContent = matchedRec.notes || 'Không có nhận xét chi tiết.';
+
+      // Pre-populate interviewer recommendations to HR fields if they are empty
+      if (!cand.offerGross) {
+        document.getElementById('offer-gross').value = matchedRec.salary || '';
+        document.getElementById('offer-probation').value = matchedRec.salary || '';
+      } else {
+        document.getElementById('offer-gross').value = cand.offerGross;
+        document.getElementById('offer-probation').value = cand.probationSalary || cand.offerGross;
+      }
+
+      if (!cand.offerStartDate) {
+        document.getElementById('offer-start-date').value = matchedRec.startDate || '';
+      } else {
+        document.getElementById('offer-start-date').value = cand.offerStartDate;
+      }
+    } else {
+      if (recCard) recCard.classList.add('hidden');
+      document.getElementById('offer-gross').value = cand.offerGross || '';
+      document.getElementById('offer-probation').value = cand.probationSalary || cand.offerGross || '';
+      document.getElementById('offer-start-date').value = cand.offerStartDate || '';
+    }
+
+    document.getElementById('offer-net').value = cand.offerNet || '';
+
+    if (cand.currencyUnit) {
+      document.getElementById('offer-currency-gross').value = cand.currencyUnit;
+      document.getElementById('offer-currency-net').value = cand.currencyUnit;
+      document.getElementById('offer-currency-probation').value = cand.currencyUnit;
+    } else {
+      document.getElementById('offer-currency-gross').value = 'VND';
+      document.getElementById('offer-currency-net').value = 'VND';
+      document.getElementById('offer-currency-probation').value = 'VND';
+    }
+
+    document.getElementById('offer-location').value = cand.offerLocation || 'Hội sở chính';
+    document.getElementById('offer-expiry-date').value = cand.offerExpiry || '';
+    document.getElementById('offer-send-email-checkbox').checked = true;
+
+    document.getElementById('offer-email-preview-wrapper').classList.remove('hidden');
+    document.getElementById('modal-offer').classList.remove('hidden');
+    generateEmailPreview('offer');
+  }
+
+  function toggleOfferEmailField() {
+    const isChecked = document.getElementById('offer-send-email-checkbox').checked;
+    const wrapper = document.getElementById('offer-email-preview-wrapper');
+    if (isChecked) {
+      wrapper.classList.remove('hidden');
+    } else {
+      wrapper.classList.add('hidden');
+    }
+  }
+
+  /**
+   * Submit offer details and send offer notification
+   */
+  function submitOffer() {
+    const id = document.getElementById('offer-cand-id').value;
+    const gross = document.getElementById('offer-gross').value.trim();
+    const net = document.getElementById('offer-net').value.trim();
+    const probation = document.getElementById('offer-probation').value.trim();
+    const currency = document.getElementById('offer-currency-gross').value;
+    const startDate = document.getElementById('offer-start-date').value;
+    const location = document.getElementById('offer-location').value.trim();
+    const expiryDate = document.getElementById('offer-expiry-date').value;
+    const sendEmail = document.getElementById('offer-send-email-checkbox').checked;
+    const emailBody = (typeof quillOfferPreview !== 'undefined' && quillOfferPreview)
+      ? quillOfferPreview.root.innerHTML
+      : document.getElementById('offer-email-preview').innerHTML;
+
+    const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+
+    if (!gross || !net || !startDate || !expiryDate) {
+      const errFields = currentLang === 'vi' ? 'Vui lòng nhập đầy đủ thông tin lương, ngày nhận việc và hạn offer.' : 'Please enter salary, start date, and offer expiry.';
+      showToast(errFields, 'warning');
+      return;
+    }
+
+    closeModal('offer');
+
+    const loadMsg = currentLang === 'vi' ? 'Đang tạo tài liệu Offer PDF và gửi email...' : 'Generating Offer PDF and emailing candidate...';
+    showLoading(loadMsg);
+
+    runBackend('updateCandidateStatus', id, 'Passed', {
+      gross: gross,
+      net: net,
+      probation: probation,
+      probationSalary: probation,
+      currencyUnit: currency,
+      startDate: startDate,
+      location: location,
+      expiryDate: expiryDate,
+      sendEmail: sendEmail,
+      emailBody: emailBody
+    })
+      .then(() => {
+        hideLoading();
+        showToast(currentLang === 'vi' ? 'Thiết lập Offer thành công!' : 'Offer recorded successfully!', 'success');
+        loadCandidatesTable();
+        activeCandidate = null;
+      })
+      .catch(err => {
+        hideLoading();
+        showToast('Offer update failed: ' + err.message, 'error');
+        activeCandidate = null;
+        loadCandidatesTable();
+      });
+  }
+
+  /**
+   * PDF document rendering and browser print dialog trigger
+   */
+  function printCandidateDoc(candidateId, templateType) {
+    const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+    showLoading(currentLang === 'vi' ? 'Đang tạo tài liệu PDF...' : 'Generating Document PDF...');
+
+    runBackend('generatePDF', candidateId, templateType)
+      .then(res => {
+        hideLoading();
+        if (res && res.base64) {
+          // Dynamic print iframe setup
+          let iframe = document.getElementById('silent-print-iframe');
+          if (!iframe) {
+            iframe = document.createElement('iframe');
+            iframe.id = 'silent-print-iframe';
+            iframe.style.position = 'fixed';
+            iframe.style.width = '0px';
+            iframe.style.height = '0px';
+            iframe.style.border = 'none';
+            document.body.appendChild(iframe);
+          }
+          iframe.src = 'data:application/pdf;base64,' + res.base64;
+
+          setTimeout(() => {
+            try {
+              iframe.contentWindow.print();
+            } catch (e) {
+              window.open(res.url, '_blank');
+            }
+          }, 1000);
+        } else {
+          showToast('Failed to generate printable PDF.', 'error');
+        }
+      })
+      .catch(err => {
+        hideLoading();
+        showToast('Document print failed: ' + err.message, 'error');
+      });
+  }
+
+  /**
+   * Confirm and delete candidate permanently
+   */
+  function deleteCandidateRecord(candidateId) {
+    const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+    const confirmMsg = currentLang === 'vi'
+      ? 'Bạn có chắc chắn muốn xóa vĩnh viễn ứng viên này khỏi hệ thống?'
+      : 'Are you sure you want to permanently delete this candidate?';
+
+    if (confirm(confirmMsg)) {
+      showLoading(currentLang === 'vi' ? 'Đang xóa hồ sơ...' : 'Deleting candidate...');
+
+      runBackend('deleteCandidate', candidateId)
+        .then(() => {
+          hideLoading();
+          showToast(currentLang === 'vi' ? 'Đã xóa ứng viên thành công!' : 'Candidate deleted successfully!', 'success');
+          loadCandidatesTable();
+        })
+        .catch(err => {
+          hideLoading();
+          showToast('Delete failed: ' + err.message, 'error');
+        });
+    }
+  }
+</script>

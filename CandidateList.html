@@ -1,0 +1,351 @@
+<!-- Candidates List View -->
+<div class="relative min-h-[calc(100vh-10rem)] flex flex-col gap-6 animate-fade-in">
+  
+  <!-- Top Header Title & Actions -->
+  <div class="glass-card p-6 rounded-3xl flex flex-col md:flex-row items-center justify-between gap-4 shadow-lg border border-slate-800/80">
+    <div>
+      <div class="flex items-center gap-2">
+        <h2 class="text-xl font-extrabold text-white dark:text-white" data-i18n="nav-candidates">Quản lý Danh sách Ứng viên</h2>
+        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Cập nhật tự động</span>
+      </div>
+      <p class="text-xs text-slate-400 mt-1">Tìm kiếm, lọc danh sách ứng viên, quản lý quy trình phỏng vấn và xuất thư mời nhận việc PDF</p>
+    </div>
+    
+    <div class="flex items-center gap-3">
+      <button onclick="loadCandidatesTable()" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-semibold text-white bg-indigo-600 hover:bg-indigo-500 active:scale-95 transition-all shadow-md shadow-indigo-600/25 cursor-pointer">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"></path></svg>
+        <span>Tải lại ứng viên</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Filters & Quick Search Panel -->
+  <div class="glass-card p-4 md:p-6 rounded-3xl flex flex-col xl:flex-row items-center justify-between gap-4 shadow-lg border border-slate-800/80">
+    <!-- Status Filter Segmented Tabs -->
+    <div class="flex items-center gap-1 p-1 bg-slate-900/90 dark:bg-slate-900/90 rounded-2xl border border-slate-800 overflow-x-auto max-w-full">
+      <button id="filter-all" onclick="filterCandidates('All')" class="px-4 py-2 rounded-xl text-xs font-bold transition-all duration-150 bg-indigo-600 text-white shadow-md shadow-indigo-600/25 cursor-pointer">
+        Tất cả / All
+      </button>
+      <button id="filter-new" onclick="filterCandidates('New')" class="px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-150 text-slate-400 hover:text-slate-200 cursor-pointer" data-i18n="cand-status-new">
+        Mới nhận
+      </button>
+      <button id="filter-suitable" onclick="filterCandidates('Suitable')" class="px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-150 text-slate-400 hover:text-slate-200 cursor-pointer" data-i18n="cand-status-suitable">
+        Đang phỏng vấn
+      </button>
+      <button id="filter-pending" onclick="filterCandidates('Pending')" class="px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-150 text-slate-400 hover:text-slate-200 cursor-pointer">
+        Chờ phỏng vấn
+      </button>
+      <button id="filter-unsuitable" onclick="filterCandidates('Unsuitable')" class="px-4 py-2 rounded-xl text-xs font-semibold transition-all duration-150 text-slate-400 hover:text-slate-200 cursor-pointer" data-i18n="cand-status-unsuitable">
+        Không đạt
+      </button>
+    </div>
+
+    <!-- Right Controls: Date Range Pickers & Search Input -->
+    <div class="flex flex-wrap items-center gap-3 w-full xl:w-auto text-xs">
+      <!-- Date range filters -->
+      <div class="flex items-center gap-2 text-slate-400 font-medium">
+        <span class="whitespace-nowrap">Từ:</span>
+        <input type="date" id="cand-date-from" onchange="searchCandidates()" class="px-3 py-2 rounded-xl glass-input w-36 font-mono text-[11px]">
+        <span class="whitespace-nowrap">Đến:</span>
+        <input type="date" id="cand-date-to" onchange="searchCandidates()" class="px-3 py-2 rounded-xl glass-input w-36 font-mono text-[11px]">
+      </div>
+      
+      <!-- Quick Search Input -->
+      <div class="relative w-full sm:w-64">
+        <input type="text" id="cand-search-input" onkeyup="searchCandidates()" placeholder="Tìm tên, email, vị trí..." class="w-full pl-10 pr-4 py-2.5 rounded-xl glass-input text-xs font-medium">
+        <div class="absolute left-3.5 top-3 text-slate-400">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"></path></svg>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Indicator Legends Bar -->
+  <div class="glass-card p-4 rounded-2xl border border-slate-800/80 flex flex-wrap items-center justify-between gap-4 text-[11px] font-semibold text-slate-400 shadow-sm">
+    <div class="flex items-center gap-2">
+      <span class="text-slate-300 font-bold uppercase tracking-wider text-[10px]">Trạng thái Email:</span>
+    </div>
+    <div class="flex flex-wrap items-center gap-5">
+      <div class="flex items-center gap-1.5">
+        <span class="w-2.5 h-2.5 rounded-full bg-blue-500 shadow-sm shadow-blue-500/50 block"></span>
+        <span>Thư mời PV</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-2.5 h-2.5 rounded-full bg-amber-500 shadow-sm shadow-amber-500/50 block"></span>
+        <span>Từ chối hồ sơ</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-2.5 h-2.5 rounded-full bg-emerald-500 shadow-sm shadow-emerald-500/50 block"></span>
+        <span>Offer Letter</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-2.5 h-2.5 rounded-full bg-rose-500 shadow-sm shadow-rose-500/50 block"></span>
+        <span>Trượt PV</span>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <span class="w-2.5 h-2.5 rounded-full bg-slate-500 block"></span>
+        <span>Chưa gửi thư</span>
+      </div>
+    </div>
+  </div>
+
+  <!-- Candidate Data Grid Table -->
+  <div class="glass-card rounded-3xl shadow-xl overflow-hidden border border-slate-800/80">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs glass-table">
+        <thead>
+          <tr>
+            <th class="p-4 font-bold text-slate-300 uppercase tracking-wider w-10 text-center"></th>
+            <th class="p-4 font-bold text-slate-300 uppercase tracking-wider" data-i18n="table-th-cand">Ứng viên</th>
+            <th class="p-4 font-bold text-slate-300 uppercase tracking-wider" data-i18n="table-th-subject">Tiêu đề / Vị trí</th>
+            <th class="p-4 font-bold text-slate-300 uppercase tracking-wider" data-i18n="table-th-date">Ngày nhận</th>
+            <th class="p-4 font-bold text-slate-300 uppercase tracking-wider" data-i18n="nav-candidates">Trạng thái</th>
+            <th class="p-4 font-bold text-slate-300 uppercase tracking-wider text-right" data-i18n="cand-th-actions">Thao tác xử lý</th>
+          </tr>
+        </thead>
+        <tbody id="candidates-table-rows" class="divide-y divide-slate-800/50">
+          <!-- Dynamic Candidate Rows -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  /**
+   * Fetch candidates from Sheet database and render table
+   */
+  function loadCandidatesTable() {
+    const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+    const loadMsg = currentLang === 'vi' ? 'Đang tải danh sách ứng viên...' : 'Loading candidates list...';
+    showLoading(loadMsg);
+    
+    runBackend('getCandidates')
+      .then(candidates => {
+        hideLoading();
+        allCandidates = candidates;
+        renderCandidates();
+      })
+      .catch(err => {
+        hideLoading();
+        showToast('Error loading candidates: ' + err.message, 'error');
+      });
+  }
+
+  /**
+   * Render table grid matching filters & query
+   */
+  function renderCandidates() {
+    const tableBody = document.getElementById('candidates-table-rows');
+    if (!tableBody) return;
+    tableBody.innerHTML = '';
+
+    const query = document.getElementById('cand-search-input').value.toLowerCase().trim();
+    const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+    
+    const dateFromRaw = document.getElementById('cand-date-from').value;
+    const dateToRaw = document.getElementById('cand-date-to').value;
+    const dateFrom = dateFromRaw ? new Date(dateFromRaw + 'T00:00:00') : null;
+    const dateTo = dateToRaw ? new Date(dateToRaw + 'T23:59:59') : null;
+
+    // Filter candidates list
+    const filtered = allCandidates.filter(c => {
+      if (currentFilter !== 'All') {
+        if (currentFilter === 'New' && c.status !== 'New') return false;
+        if (currentFilter === 'Suitable' && c.status !== 'Suitable') return false;
+        if (currentFilter === 'Pending' && c.status !== 'Pending') return false;
+        if (currentFilter === 'Unsuitable' && c.status !== 'Failed' && c.status !== 'Unsuitable') return false;
+      }
+      
+      if (c.receivedDate) {
+        const recDate = new Date(c.receivedDate);
+        if (dateFrom && recDate < dateFrom) return false;
+        if (dateTo && recDate > dateTo) return false;
+      }
+
+      if (query) {
+        return (c.senderName && c.senderName.toLowerCase().includes(query)) ||
+               (c.senderEmail && c.senderEmail.toLowerCase().includes(query)) ||
+               (c.subject && c.subject.toLowerCase().includes(query)) ||
+               (c.id && c.id.toLowerCase().includes(query));
+      }
+      return true;
+    });
+
+    if (filtered.length === 0) {
+      const noResultsMsg = currentLang === 'vi' 
+        ? 'Không tìm thấy ứng viên nào khớp với bộ lọc.' 
+        : 'No candidates match the current filters.';
+        
+      tableBody.innerHTML = '<tr><td colspan="6" class="p-8 text-center text-slate-400 font-medium italic">' + noResultsMsg + '</td></tr>';
+      return;
+    }
+
+    filtered.forEach(cand => {
+      // Setup status badge
+      let badgeClass = 'badge-new';
+      let statusLabel = cand.status;
+      
+      if (cand.status === 'Suitable') {
+        badgeClass = 'badge-suitable';
+        statusLabel = currentLang === 'vi' ? 'Đang phỏng vấn' : 'Interviewing';
+      } else if (cand.status === 'Pending') {
+        badgeClass = 'badge-pending';
+        statusLabel = currentLang === 'vi' ? 'Chờ phỏng vấn' : 'Pending';
+      } else if (cand.status === 'Interviewed') {
+        badgeClass = 'bg-indigo-950/40 text-indigo-300 border border-indigo-500/30';
+        statusLabel = currentLang === 'vi' ? 'Đã phỏng vấn' : 'Interviewed';
+      } else if (cand.status === 'Passed') {
+        badgeClass = 'badge-passed';
+        statusLabel = currentLang === 'vi' ? 'Đạt' : 'Passed';
+      } else if (cand.status === 'Failed') {
+        badgeClass = 'badge-unsuitable';
+        statusLabel = currentLang === 'vi' ? 'Không đạt' : 'Failed';
+      } else if (cand.status === 'Cancelled') {
+        badgeClass = 'badge-cancelled';
+        statusLabel = currentLang === 'vi' ? 'Hủy phỏng vấn' : 'Cancelled';
+      } else {
+        badgeClass = 'badge-new';
+        statusLabel = currentLang === 'vi' ? 'Mới nhận' : 'New';
+      }
+
+      // Status selector dropdown with locking rules
+      const sessionUser = JSON.parse(localStorage.getItem('recruitment_user') || '{}');
+      const isAdmin = sessionUser.role === 'Admin';
+      const isLocked = (cand.status === 'Failed' || cand.status === 'Unsuitable') && !isAdmin;
+      const selectDisabledAttr = isLocked ? 'disabled title="Chỉ Admin mới có quyền mở khóa trạng thái này"' : '';
+
+      const statusOptions = [
+        { value: 'New', vi: 'Mới', en: 'New' },
+        { value: 'Suitable', vi: 'Đang phỏng vấn', en: 'Interviewing' },
+        { value: 'Pending', vi: 'Chờ phỏng vấn', en: 'Pending' },
+        { value: 'Interviewed', vi: 'Đã phỏng vấn', en: 'Interviewed' },
+        { value: 'Passed', vi: 'Đạt', en: 'Passed' },
+        { value: 'Failed', vi: 'Không đạt', en: 'Failed' },
+        { value: 'Cancelled', vi: 'Hủy phỏng vấn', en: 'Cancelled' }
+      ];
+      
+      let selectOptions = '';
+      statusOptions.forEach(opt => {
+        const selected = cand.status === opt.value ? 'selected' : '';
+        const text = currentLang === 'vi' ? opt.vi : opt.en;
+        selectOptions += '<option value="' + opt.value + '" ' + selected + '>' + text + '</option>';
+      });
+
+      // Color status circles and tooltips mapping
+      let circleColor = 'bg-slate-600';
+      let tooltipText = currentLang === 'vi' ? 'Chưa gửi email nào' : 'No email sent yet';
+
+      if (cand.sentCancelAt) {
+        circleColor = 'bg-yellow-500';
+        tooltipText = (currentLang === 'vi' ? 'Đã gửi thư hủy phỏng vấn: ' : 'Sent Cancellation Email: ') + cand.sentCancelAt;
+      } else if (cand.sentFailedAt) {
+        circleColor = 'bg-rose-500';
+        tooltipText = (currentLang === 'vi' ? 'Đã gửi thư không đạt: ' : 'Sent Interview Failed Email: ') + cand.sentFailedAt;
+      } else if (cand.sentOfferAt) {
+        circleColor = 'bg-emerald-500';
+        tooltipText = (currentLang === 'vi' ? 'Đã gửi Offer Letter: ' : 'Sent Offer Letter: ') + cand.sentOfferAt;
+      } else if (cand.sentUnsuitableAt) {
+        circleColor = 'bg-amber-500';
+        tooltipText = (currentLang === 'vi' ? 'Đã gửi thư từ chối hồ sơ: ' : 'Sent Rejection Email: ') + cand.sentUnsuitableAt;
+      } else if (cand.sentInviteAt) {
+        circleColor = 'bg-blue-500';
+        tooltipText = (currentLang === 'vi' ? 'Đã gửi thư mời phỏng vấn: ' : 'Sent Interview Invitation: ') + cand.sentInviteAt;
+      }
+      
+      const indicatorHTML = '<td class="p-4 text-center"><span class="w-3 h-3 rounded-full ' + circleColor + ' block shadow-sm mx-auto" title="' + tooltipText + '"></span></td>';
+
+      // Actions Construction
+      const btnBaseClass = "p-2 rounded-xl bg-slate-900/60 dark:bg-slate-900/60 hover:bg-indigo-600 hover:text-white border border-slate-700/50 text-slate-300 transition-all shadow-sm flex items-center justify-center cursor-pointer";
+      
+      const appPrintDisabled = (cand.assignedFormId && cand.assignedFormId.trim() !== '') ? '' : 'disabled opacity-30 cursor-not-allowed';
+      const appPrintBtn = `<button onclick="printCandidateDoc('${cand.id}', 'APPLICATION')" ${appPrintDisabled} class="${btnBaseClass}" title="In hồ sơ ứng tuyển (Google Form)"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg></button>`;
+
+      const offerPrintDisabled = cand.status === 'Passed' ? '' : 'disabled opacity-30 cursor-not-allowed';
+      const offerPrintBtn = `<button onclick="printCandidateDoc('${cand.id}', 'OFFER')" ${offerPrintDisabled} class="${btnBaseClass} hover:text-emerald-400" title="In thư mời nhận việc (Offer Letter)"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 20H5a2 2 0 01-2-2V6a2 2 0 012-2h10a2 2 0 012 2v1m2 4a2 2 0 11-4 0v-4a2 2 0 014 0v4zM11 12H7m4 4H7"></path></svg></button>`;
+
+      const offerBtn = `<button onclick="openOfferModal('${cand.id}')" class="${btnBaseClass} text-emerald-400 hover:text-white hover:bg-emerald-600" title="Thiết lập Offer Letter"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8c-1.657 0-3 .895-3 2s1.343 2 3 2 3 .895 3 2-1.343 2-3 2m0-8c1.11 0 2.08.402 2.599 1M12 8V7m0 1v8m0 0v1m0-1c-1.11 0-2.08-.402-2.599-1M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></button>`;
+
+      const deleteBtn = `<button onclick="deleteCandidateRecord('${cand.id}')" class="${btnBaseClass} hover:text-white hover:bg-rose-600 border-rose-900/30 text-rose-400" title="Xóa ứng viên"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path></svg></button>`;
+
+      const isDriveLink = cand.cvLink && cand.cvLink.startsWith('http');
+      const cvButtonHTML = isDriveLink
+        ? `<button onclick="previewCvSaved('${cand.id}')" class="${btnBaseClass} text-indigo-400" title="Xem hồ sơ & CV"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.43 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"></path></svg></button>`
+        : `<span class="${btnBaseClass} opacity-30 cursor-not-allowed text-slate-500" title="Không có CV"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728A9 9 0 015.636 5.636m12.728 12.728L5.636 5.636"></path></svg></span>`;
+
+      let formResponseBtn = '';
+      if (cand.assignedFormId && cand.assignedFormId.trim() !== '') {
+        formResponseBtn = `<button onclick="viewCandidateFormResponse('${cand.senderEmail}', '${cand.assignedFormId}')" class="${btnBaseClass} text-indigo-400" title="Xem Phản hồi Google Form"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path></svg></button>`;
+      } else {
+        formResponseBtn = `<span class="${btnBaseClass} opacity-30 cursor-not-allowed text-slate-500" title="Chưa điền Form"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9.172 16.172a4 4 0 015.656 0M9 10h.01M15 10h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path></svg></span>`;
+      }
+
+      const statusSelectorDropdown = `<select ${selectDisabledAttr} onchange="changeCandidateStatus('${cand.id}', this.value)" class="bg-slate-900 text-slate-200 text-xs px-2.5 py-1.5 rounded-xl border border-slate-700/60 focus:outline-none focus:ring-1 focus:ring-indigo-500 font-semibold ${isLocked ? 'opacity-50 cursor-not-allowed' : ''}">${selectOptions}</select>`;
+
+      const actionsHTML = `
+        <div class="flex items-center justify-end gap-1.5">
+          ${statusSelectorDropdown}
+          ${cvButtonHTML}
+          ${formResponseBtn}
+          ${appPrintBtn}
+          ${offerBtn}
+          ${offerPrintBtn}
+          ${deleteBtn}
+        </div>
+      `;
+
+      // Generate Avatar Initials
+      const initial = cand.senderName ? cand.senderName.charAt(0).toUpperCase() : '?';
+
+      const row = document.createElement('tr');
+      row.setAttribute('data-cand-row-id', cand.id);
+      row.setAttribute('data-sender-name', cand.senderName);
+      row.setAttribute('data-sender-email', cand.senderEmail);
+      row.setAttribute('data-cv-link', cand.cvLink);
+      row.setAttribute('data-assigned-form-id', cand.assignedFormId || '');
+      row.setAttribute('data-assigned-form-sent', cand.sentInviteAt || '');
+      
+      if (cand.sentOfferAt && cand.sentOfferAt.trim() !== '') {
+        row.className = "bg-emerald-950/20 hover:bg-emerald-950/30 border-l-4 border-emerald-500 transition-colors";
+      } else {
+        row.className = "hover:bg-slate-800/30 transition-colors";
+      }
+      
+      row.innerHTML = indicatorHTML +
+                      '<td class="p-4"><div class="flex items-center gap-3"><div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold text-xs flex items-center justify-center shadow-md">' + initial + '</div><div><div class="font-bold text-white text-sm">' + cand.senderName + '</div><div class="text-slate-400 text-xs font-mono">' + cand.senderEmail + '</div></div></div></td>' +
+                      '<td class="p-4"><div class="text-slate-200 font-semibold line-clamp-1 max-w-[220px]">' + cand.subject + '</div><div class="text-[10px] text-indigo-400 font-mono mt-0.5">' + cand.id + '</div></td>' +
+                      '<td class="p-4 text-slate-400 text-xs font-medium">' + cand.receivedDate + '</td>' +
+                      '<td class="p-4 status-cell"><span class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider ' + badgeClass + '">' + statusLabel + '</span></td>' +
+                      '<td class="p-4 text-right actions-cell"><div class="flex items-center justify-end">' + actionsHTML + '</div></td>';
+      tableBody.appendChild(row);
+    });
+  }
+
+  /**
+   * Filter click tabs handling
+   */
+  function filterCandidates(filter) {
+    currentFilter = filter;
+    const tabs = ['All', 'New', 'Suitable', 'Pending', 'Unsuitable'];
+    tabs.forEach(t => {
+      const btn = document.getElementById('filter-' + t.toLowerCase());
+      if (btn) {
+        btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-md');
+        btn.classList.add('text-slate-400', 'hover:text-slate-200');
+      }
+    });
+
+    const activeBtn = document.getElementById('filter-' + filter.toLowerCase());
+    if (activeBtn) {
+      activeBtn.classList.add('bg-indigo-600', 'text-white', 'shadow-md');
+      activeBtn.classList.remove('text-slate-400', 'hover:text-slate-200');
+    }
+
+    renderCandidates();
+  }
+
+  function searchCandidates() {
+    renderCandidates();
+  }
+</script>

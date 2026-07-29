@@ -1,0 +1,510 @@
+<!-- Employee Manager Component -->
+<div id="employee-manager-module" class="space-y-6 animate-fade-in" x-data="employeeState">
+  
+  <!-- HR Dashboard for Admin/HR -->
+  <template x-if="role === 'Admin' || role === 'HR'">
+    <div class="space-y-6">
+      
+      <!-- Page Header -->
+      <div class="glass-card p-6 rounded-3xl flex flex-col md:flex-row md:items-center md:justify-between gap-4 shadow-lg border border-slate-800/80">
+        <div>
+          <div class="flex items-center gap-2">
+            <h2 class="text-xl font-extrabold text-white dark:text-white">Danh sách Nhân sự & Hợp đồng</h2>
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">HR Database</span>
+          </div>
+          <p class="text-xs text-slate-400 mt-1">Quản lý hồ sơ nhân viên, điều chỉnh lương, thăng chức và theo dõi hợp đồng lao động</p>
+        </div>
+
+        <button @click="openAddEmployeeModal()" class="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/25 active:scale-95 transition-all cursor-pointer">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"></path></svg>
+          <span>Thêm Nhân viên mới</span>
+        </button>
+      </div>
+
+      <!-- Contract Expiry Warnings Widget -->
+      <div x-show="warnings.length > 0" class="glass-card p-5 bg-amber-500/10 border border-amber-500/30 rounded-3xl space-y-3 shadow-md">
+        <div class="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+          <svg class="w-5 h-5 text-amber-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path></svg>
+          <span>Cảnh báo Hợp đồng sắp hết hạn (15-30 ngày)</span>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+          <template x-for="warn in warnings" :key="warn.employee.id">
+            <div class="p-3.5 bg-slate-900/90 border border-amber-500/30 rounded-2xl flex items-center justify-between text-xs">
+              <div>
+                <p class="font-bold text-white" x-text="warn.employee.fullName"></p>
+                <p class="text-[10px] text-slate-400 mt-0.5" x-text="`${warn.employee.department} - ${warn.employee.position}`"></p>
+                <p class="text-[10px] text-amber-400 font-semibold mt-1" x-text="`Hết hạn: ${warn.employee.endDate}`"></p>
+              </div>
+              <span class="px-2.5 py-1 rounded-xl bg-amber-500/20 text-amber-300 font-bold text-[10px] border border-amber-500/30" x-text="`Còn ${warn.daysLeft} ngày`"></span>
+            </div>
+          </template>
+        </div>
+      </div>
+
+      <!-- Filters & Search Panel -->
+      <div class="glass-card p-5 rounded-3xl border border-slate-800/80 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 shadow-lg">
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Tìm kiếm nhân viên</label>
+          <input type="text" x-model="searchQuery" placeholder="Tên, Email hoặc SĐT..." class="w-full px-3.5 py-2.5 text-xs rounded-xl glass-input font-medium">
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Phòng ban</label>
+          <select x-model="filterDept" class="w-full px-3.5 py-2.5 text-xs rounded-xl glass-input font-semibold bg-slate-900">
+            <option value="All">Tất cả phòng ban</option>
+            <template x-for="dept in departments" :key="dept">
+              <option :value="dept" x-text="dept"></option>
+            </template>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Loại Hợp đồng</label>
+          <select x-model="filterContract" class="w-full px-3.5 py-2.5 text-xs rounded-xl glass-input font-semibold bg-slate-900">
+            <option value="All">Tất cả loại HĐ</option>
+            <option value="Thử việc">Thử việc</option>
+            <option value="1 năm">1 năm</option>
+            <option value="Không thời hạn">Không thời hạn</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1.5">Trạng thái làm việc</label>
+          <select x-model="filterStatus" class="w-full px-3.5 py-2.5 text-xs rounded-xl glass-input font-semibold bg-slate-900">
+            <option value="Đang làm">Đang làm việc</option>
+            <option value="Đã nghỉ">Đã nghỉ việc</option>
+            <option value="All">Tất cả</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Employees Table Container -->
+      <div class="glass-card rounded-3xl shadow-xl overflow-hidden border border-slate-800/80">
+        <div class="overflow-x-auto">
+          <table class="w-full text-left glass-table text-xs">
+            <thead>
+              <tr>
+                <th class="p-4 font-bold text-slate-300 uppercase tracking-wider">Mã NV</th>
+                <th class="p-4 font-bold text-slate-300 uppercase tracking-wider">Nhân viên</th>
+                <th class="p-4 font-bold text-slate-300 uppercase tracking-wider">Phòng ban / Chức vụ</th>
+                <th class="p-4 font-bold text-slate-300 uppercase tracking-wider">Loại HĐ / Thời hạn</th>
+                <th class="p-4 font-bold text-slate-300 uppercase tracking-wider text-right">Lương CB / Phụ cấp</th>
+                <th class="p-4 font-bold text-slate-300 uppercase tracking-wider">Trạng thái</th>
+                <th class="p-4 font-bold text-slate-300 uppercase tracking-wider text-center">Hành động</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/50">
+              <template x-for="emp in filteredEmployees" :key="emp.id">
+                <tr class="hover:bg-slate-800/30 transition-colors">
+                  <td class="p-4 font-extrabold text-indigo-400 font-mono" x-text="emp.id"></td>
+                  <td class="p-4">
+                    <div class="flex items-center gap-3">
+                      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 text-white font-bold text-xs flex items-center justify-center shadow-sm" x-text="emp.fullName ? emp.fullName.charAt(0).toUpperCase() : 'E'"></div>
+                      <div>
+                        <p class="font-bold text-white text-sm" x-text="emp.fullName"></p>
+                        <p class="text-[10px] text-slate-400 font-mono" x-text="emp.email"></p>
+                        <p class="text-[10px] text-slate-400 font-mono" x-text="emp.phone"></p>
+                      </div>
+                    </div>
+                  </td>
+                  <td class="p-4">
+                    <p class="font-semibold text-slate-200" x-text="emp.department"></p>
+                    <p class="text-[10px] text-slate-400" x-text="emp.position"></p>
+                  </td>
+                  <td class="p-4">
+                    <span class="px-2.5 py-0.5 rounded-lg bg-slate-800 text-slate-300 text-[10px] font-semibold border border-slate-700/50" x-text="emp.contractType"></span>
+                    <p class="text-[10px] text-slate-400 mt-1 font-mono" x-text="`Từ: ${emp.startDate} ${emp.endDate ? 'đến ' + emp.endDate : ''}`"></p>
+                  </td>
+                  <td class="p-4 text-right">
+                    <p class="font-extrabold text-white" x-text="formatCurrency(emp.basicSalary)"></p>
+                    <p class="text-[10px] text-emerald-400 font-semibold mt-0.5" x-text="`+ PC: ${formatCurrency(emp.allowance)}`"></p>
+                  </td>
+                  <td class="p-4">
+                    <span :class="emp.status === 'Đang làm' ? 'bg-emerald-500/15 text-emerald-300 border-emerald-500/30' : 'bg-rose-500/15 text-rose-300 border-rose-500/30'" class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider border" x-text="emp.status"></span>
+                  </td>
+                  <td class="p-4">
+                    <div class="flex items-center justify-center gap-1.5">
+                      <button @click="viewEmployeeDetail(emp.id)" class="p-2 rounded-xl bg-slate-900/60 hover:bg-indigo-600 hover:text-white border border-slate-700/50 text-indigo-400 transition-all cursor-pointer" title="Hồ sơ chi tiết">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"></path><circle cx="12" cy="12" r="3"></circle></svg>
+                      </button>
+                      <button @click="openEditEmployeeModal(emp)" class="p-2 rounded-xl bg-slate-900/60 hover:bg-slate-700 text-slate-300 border border-slate-700/50 transition-all cursor-pointer" title="Chỉnh sửa">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"></path></svg>
+                      </button>
+                      <button @click="openSalaryModal(emp)" class="p-2 rounded-xl bg-slate-900/60 hover:bg-emerald-600 hover:text-white text-emerald-400 border border-slate-700/50 transition-all cursor-pointer" title="Tăng lương">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-3l3 3 3-3m-6-6l3-3 3 3"></path></svg>
+                      </button>
+                    </div>
+                  </td>
+                </tr>
+              </template>
+              <template x-if="filteredEmployees.length === 0">
+                <tr>
+                  <td colspan="7" class="p-8 text-center text-slate-400 font-medium italic">Không có dữ liệu nhân viên nào khớp với bộ lọc.</td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+    </div>
+  </template>
+
+  <!-- Profile View for Employee / Manager Role -->
+  <template x-if="role === 'Employee' || role === 'Manager'">
+    <div class="max-w-4xl mx-auto space-y-6">
+      <!-- Profile Header Card -->
+      <div class="glass-card p-6 rounded-3xl flex items-center gap-5 shadow-xl border border-slate-800/80">
+        <div class="bg-gradient-to-tr from-indigo-500 to-purple-600 text-white font-extrabold h-16 w-16 rounded-2xl flex items-center justify-center text-2xl shadow-lg shadow-indigo-500/30" x-text="fullName ? fullName.charAt(0).toUpperCase() : 'E'"></div>
+        <div class="space-y-1">
+          <h2 class="text-2xl font-extrabold text-white" x-text="fullName"></h2>
+          <p class="text-xs text-slate-400 font-mono" x-text="`Tài khoản cá nhân: ${email}`"></p>
+        </div>
+      </div>
+      
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+        <!-- Personal Info Card -->
+        <div class="glass-card p-6 rounded-3xl space-y-4 shadow-lg border border-slate-800/80">
+          <h3 class="text-sm font-bold text-white border-b border-slate-800 pb-3 flex items-center gap-2">
+            <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"></path></svg>
+            <span>Thông tin Hồ sơ</span>
+          </h3>
+          <div class="space-y-3 text-xs">
+            <div class="flex justify-between items-center"><span class="text-slate-400">Mã Nhân viên:</span><strong class="text-indigo-400 font-mono" x-text="personalProfile.id"></strong></div>
+            <div class="flex justify-between items-center"><span class="text-slate-400">Số điện thoại:</span><strong class="text-slate-200 font-mono" x-text="personalProfile.phone"></strong></div>
+            <div class="flex justify-between items-center"><span class="text-slate-400">Phòng ban:</span><strong class="text-slate-200" x-text="personalProfile.department"></strong></div>
+            <div class="flex justify-between items-center"><span class="text-slate-400">Chức vụ:</span><strong class="text-slate-200" x-text="personalProfile.position"></strong></div>
+          </div>
+        </div>
+
+        <!-- Contract & Salary Card -->
+        <div class="glass-card p-6 rounded-3xl space-y-4 shadow-lg border border-slate-800/80">
+          <h3 class="text-sm font-bold text-white border-b border-slate-800 pb-3 flex items-center gap-2">
+            <svg class="w-4 h-4 text-emerald-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+            <span>Thông tin Hợp đồng & Lương</span>
+          </h3>
+          <div class="space-y-3 text-xs">
+            <div class="flex justify-between items-center"><span class="text-slate-400">Loại Hợp đồng:</span><strong class="text-slate-200" x-text="personalProfile.contractType"></strong></div>
+            <div class="flex justify-between items-center"><span class="text-slate-400">Ngày bắt đầu:</span><strong class="text-slate-200 font-mono" x-text="personalProfile.startDate"></strong></div>
+            <div class="flex justify-between items-center"><span class="text-slate-400">Ngày hết hạn HĐ:</span><strong class="text-slate-200 font-mono" x-text="personalProfile.endDate || 'Vô thời hạn'"></strong></div>
+            <div class="flex justify-between items-center"><span class="text-slate-400">Lương cơ bản:</span><strong class="text-indigo-400 font-bold text-sm" x-text="formatCurrency(personalProfile.basicSalary)"></strong></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Salary Change History Widget -->
+      <div class="glass-card p-6 rounded-3xl space-y-4 shadow-lg border border-slate-800/80">
+        <h3 class="text-sm font-bold text-white border-b border-slate-800 pb-3">Lịch sử Điều chỉnh Lương & Thăng chức</h3>
+        <div class="overflow-x-auto rounded-2xl border border-slate-800/80">
+          <table class="w-full text-left text-xs glass-table">
+            <thead>
+              <tr>
+                <th class="p-3.5 font-bold text-slate-300 uppercase">Mã QD</th>
+                <th class="p-3.5 font-bold text-slate-300 uppercase">Ngày điều chỉnh</th>
+                <th class="p-3.5 font-bold text-slate-300 uppercase text-right">Mức lương mới</th>
+                <th class="p-3.5 font-bold text-slate-300 uppercase">Ghi chú</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/50">
+              <template x-for="hist in personalSalaryHistory" :key="hist.id">
+                <tr class="hover:bg-slate-800/30 transition-colors">
+                  <td class="p-3.5 text-indigo-400 font-bold font-mono" x-text="hist.id"></td>
+                  <td class="p-3.5 text-slate-300 font-mono" x-text="hist.changeDate"></td>
+                  <td class="p-3.5 text-right font-extrabold text-emerald-400" x-text="formatCurrency(hist.newSalary)"></td>
+                  <td class="p-3.5 text-slate-400" x-text="hist.notes"></td>
+                </tr>
+              </template>
+              <template x-if="personalSalaryHistory.length === 0">
+                <tr>
+                  <td colspan="4" class="p-6 text-center text-slate-400 italic">Chưa có quyết định điều chỉnh lương nào được ghi nhận.</td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+  </template>
+
+  <!-- INCREASE SALARY / PROMOTION MODAL -->
+  <div x-show="showSalaryModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4" x-cloak>
+    <div class="glass-card border border-slate-800 rounded-3xl p-6 md:p-8 max-w-lg w-full space-y-6 shadow-2xl relative">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+        <h3 class="text-base font-bold text-white uppercase tracking-wider">Quyết định Tăng lương / Thăng chức</h3>
+        <button @click="showSalaryModal = false" class="text-slate-400 hover:text-white p-1 rounded-lg">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <div class="space-y-4 text-xs">
+        <div class="p-4 bg-slate-900/80 rounded-2xl border border-slate-800">
+          <p class="font-bold text-white text-sm" x-text="`Nhân viên: ${selectedEmp?.fullName}`"></p>
+          <p class="text-slate-400 mt-1 font-mono" x-text="`Lương hiện tại: ${formatCurrency(selectedEmp?.basicSalary)}`"></p>
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-300 uppercase tracking-wider mb-1.5">Mức lương mới đề xuất (VND)</label>
+          <input type="number" x-model="salaryForm.newSalary" class="w-full px-4 py-3 rounded-xl glass-input text-xs font-bold text-indigo-300">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-300 uppercase tracking-wider mb-1.5">Tải lên văn bản quyết định (Ảnh < 50KB)</label>
+          <input type="file" @change="handleFileUpload" accept="image/*" class="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white cursor-pointer">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-300 uppercase tracking-wider mb-1.5">Ghi chú / Lý do điều chỉnh</label>
+          <textarea x-model="salaryForm.notes" rows="3" placeholder="Nhập căn cứ hoặc ghi chú thăng chức..." class="w-full px-4 py-3 rounded-xl glass-input text-xs"></textarea>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-3 border-t border-slate-800 pt-5">
+        <button @click="showSalaryModal = false" class="px-5 py-2.5 border border-slate-700/80 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-bold cursor-pointer">Hủy bỏ</button>
+        <button @click="submitSalaryIncrease" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/25 active:scale-95 transition-all cursor-pointer">Ký duyệt & Tăng lương</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<!-- Hidden iframe for silent printing of salary raise decision -->
+<iframe id="salaryPrintIframe" style="display:none;"></iframe>
+
+<script>
+  document.addEventListener('alpine:init', () => {
+    if (!Alpine.store('employeeStateRegistered')) {
+      Alpine.store('employeeStateRegistered', true);
+      
+      Alpine.data('employeeState', () => ({
+        employees: [],
+        warnings: [],
+        searchQuery: '',
+        filterDept: 'All',
+        filterContract: 'All',
+        filterStatus: 'Đang làm',
+        departments: [],
+        
+        showFormModal: false,
+        showSalaryModal: false,
+        editMode: false,
+        selectedEmp: null,
+        
+        formEmp: {
+          id: '',
+          fullName: '',
+          email: '',
+          phone: '',
+          department: '',
+          position: '',
+          contractType: '1 năm',
+          startDate: '',
+          endDate: '',
+          basicSalary: 0,
+          allowance: 0,
+          status: 'Đang làm'
+        },
+        
+        salaryForm: {
+          newSalary: 0,
+          decisionBase64: '',
+          notes: ''
+        },
+
+        personalProfile: {},
+        personalSalaryHistory: [],
+
+        init() {
+          this.loadEmployeesData();
+          this.loadWarningsData();
+          
+          window.addEventListener('nav-changed', (e) => {
+            if (e.detail === 'employee-manager') {
+              this.loadEmployeesData();
+              this.loadWarningsData();
+            }
+          });
+
+          window.addEventListener('employee-updated', () => {
+            this.loadEmployeesData();
+            this.loadWarningsData();
+          });
+        },
+
+        loadEmployeesData() {
+          const userStr = localStorage.getItem('recruitment_user');
+          if (!userStr) return;
+          const user = JSON.parse(userStr);
+          const userRole = user.role;
+          const userEmail = user.email || user.username;
+
+          if (userRole === 'Admin' || userRole === 'HR') {
+            showLoading('Đang tải danh sách nhân sự...');
+            runBackend('getEmployees')
+              .then(data => {
+                this.employees = data;
+                const depts = new Set();
+                data.forEach(e => { if(e.department) depts.add(e.department); });
+                this.departments = Array.from(depts);
+                hideLoading();
+              })
+              .catch(err => {
+                hideLoading();
+                Swal.fire('Lỗi', 'Không thể tải danh sách nhân viên: ' + err.message, 'error');
+              });
+          } else {
+            showLoading('Đang tải hồ sơ cá nhân...');
+            runBackend('getEmployees')
+              .then(data => {
+                const profile = data.find(e => e.email.toLowerCase().trim() === userEmail.toLowerCase().trim());
+                if (profile) {
+                  this.personalProfile = profile;
+                  this.loadPersonalSalaryHistory(profile.id);
+                } else {
+                  this.personalProfile = {
+                    id: 'N/A',
+                    fullName: user.fullName || 'Chưa liên kết',
+                    email: userEmail,
+                    phone: 'N/A',
+                    department: 'N/A',
+                    position: 'N/A',
+                    contractType: 'N/A',
+                    startDate: 'N/A',
+                    basicSalary: 0,
+                    allowance: 0,
+                    status: 'N/A'
+                  };
+                }
+                hideLoading();
+              })
+              .catch(err => {
+                hideLoading();
+                Swal.fire('Lỗi', 'Không thể tải hồ sơ cá nhân: ' + err.message, 'error');
+              });
+          }
+        },
+
+        loadPersonalSalaryHistory(empId) {
+          runBackend('getSalaryHistory', empId)
+            .then(data => {
+              this.personalSalaryHistory = data;
+            })
+            .catch(err => console.error("Error loading personal salary logs:", err));
+        },
+
+        loadWarningsData() {
+          const userStr = localStorage.getItem('recruitment_user');
+          if (!userStr) return;
+          const user = JSON.parse(userStr);
+          if (user.role !== 'Admin' && user.role !== 'HR') return;
+          runBackend('getContractWarnings')
+            .then(data => {
+              this.warnings = data;
+            })
+            .catch(err => console.error("Error loading warnings:", err));
+        },
+
+        get filteredEmployees() {
+          return this.employees.filter(emp => {
+            const matchesSearch = emp.fullName.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+                                  emp.email.toLowerCase().includes(this.searchQuery.toLowerCase()) ||
+                                  emp.phone.includes(this.searchQuery);
+            const matchesDept = this.filterDept === 'All' || emp.department === this.filterDept;
+            const matchesContract = this.filterContract === 'All' || emp.contractType === this.filterContract;
+            const matchesStatus = this.filterStatus === 'All' || emp.status === this.filterStatus;
+            
+            return matchesSearch && matchesDept && matchesContract && matchesStatus;
+          });
+        },
+
+        openSalaryModal(emp) {
+          this.selectedEmp = emp;
+          this.salaryForm = {
+            newSalary: emp.basicSalary,
+            decisionBase64: '',
+            notes: ''
+          };
+          this.showSalaryModal = true;
+        },
+
+        handleFileUpload(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          
+          if (file.size > 50 * 1024) {
+            Swal.fire('Lỗi tệp', 'Dung lượng tệp ảnh phải nhỏ hơn 50KB.', 'error');
+            e.target.value = '';
+            return;
+          }
+          
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            this.salaryForm.decisionBase64 = event.target.result;
+          };
+          reader.readAsDataURL(file);
+        },
+
+        submitSalaryIncrease() {
+          if (!this.salaryForm.newSalary || this.salaryForm.newSalary <= 0) {
+            Swal.fire('Chú ý', 'Mức lương mới phải lớn hơn 0.', 'warning');
+            return;
+          }
+          
+          showLoading('Đang phê duyệt tăng lương & gửi email...');
+          runBackend('increaseSalary', this.selectedEmp.id, this.salaryForm.newSalary, this.salaryForm.decisionBase64, this.salaryForm.notes)
+            .then(res => {
+              hideLoading();
+              this.showSalaryModal = false;
+              
+              Swal.fire({
+                title: 'Thành công',
+                text: 'Đã quyết định tăng lương thành công! Bạn có muốn in quyết định này ra ngay không?',
+                icon: 'success',
+                showCancelButton: true,
+                confirmButtonText: 'Có, in ngay',
+                cancelButtonText: 'Bỏ qua'
+              }).then((result) => {
+                if (result.isConfirmed) {
+                  this.printSalaryDecision(res.histId);
+                }
+              });
+              
+              this.loadEmployeesData();
+            })
+            .catch(err => {
+              hideLoading();
+              Swal.fire('Lỗi', 'Không thể ký duyệt tăng lương: ' + err.message, 'error');
+            });
+        },
+
+        printSalaryDecision(histId) {
+          showLoading('Đang kết xuất văn bản in...');
+          runBackend('getSalaryDecisionPrintHtml', histId)
+            .then(html => {
+              hideLoading();
+              const iframe = document.getElementById('salaryPrintIframe');
+              if (iframe) {
+                const doc = iframe.contentDocument || iframe.contentWindow.document;
+                doc.open();
+                doc.write(html);
+                doc.close();
+                setTimeout(() => {
+                  iframe.contentWindow.focus();
+                  iframe.contentWindow.print();
+                }, 500);
+              }
+            })
+            .catch(err => {
+              hideLoading();
+              Swal.fire('Lỗi', 'Không thể kết xuất văn bản in: ' + err.message, 'error');
+            });
+        },
+
+        formatCurrency(val) {
+          if (!val) return '0 VND';
+          return Number(val).toLocaleString('vi-VN') + ' VND';
+        }
+      }));
+    }
+  });
+</script>

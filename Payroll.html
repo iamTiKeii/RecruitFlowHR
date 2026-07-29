@@ -1,0 +1,331 @@
+<!-- Payroll Component -->
+<div id="payroll-module" class="space-y-6 animate-fade-in" x-data="payrollState">
+  
+  <!-- Page Header -->
+  <div class="glass-card p-6 rounded-3xl flex flex-col md:flex-row md:items-center md:justify-between gap-4 shadow-lg border border-slate-800/80">
+    <div>
+      <div class="flex items-center gap-2">
+        <h2 class="text-xl font-extrabold text-white dark:text-white">Bảng lương & Phiếu lương Nhân sự</h2>
+        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Auto Payslip Engine</span>
+      </div>
+      <p class="text-xs text-slate-400 mt-1">Tính toán tổng thu nhập Gross, khấu trừ bảo hiểm bắt buộc, thuế TNCN lũy tiến và tự động gửi phiếu lương PDF</p>
+    </div>
+  </div>
+
+  <!-- Admin/HR Controls Panel -->
+  <template x-if="role === 'Admin' || role === 'HR'">
+    <div class="glass-card p-6 rounded-3xl border border-slate-800/80 grid grid-cols-1 md:grid-cols-3 gap-6 shadow-xl items-end text-xs">
+      <div>
+        <label class="block font-bold text-slate-300 uppercase tracking-wider mb-2">Tháng tính lương</label>
+        <select x-model="calcMonth" class="w-full px-4 py-3 rounded-xl glass-input text-xs font-bold bg-slate-900">
+          <template x-for="m in 12" :key="m">
+            <option :value="m" x-text="`Tháng ${m}`"></option>
+          </template>
+        </select>
+      </div>
+      <div>
+        <label class="block font-bold text-slate-300 uppercase tracking-wider mb-2">Năm tính lương</label>
+        <select x-model="calcYear" class="w-full px-4 py-3 rounded-xl glass-input text-xs font-bold bg-slate-900">
+          <option value="2026">Năm 2026</option>
+          <option value="2027">Năm 2027</option>
+          <option value="2028">Năm 2028</option>
+        </select>
+      </div>
+      <div class="flex gap-3">
+        <button @click="runPayrollCalculation" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/25 transition-all cursor-pointer flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 15.75V18m-7.5-6.75h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25V15zm0 2.25h.008v.008H8.25v-.008zm3-6.75h.008v.008H11.25v-.008zm0 2.25h.008v.008H11.25V15zm0 2.25h.008v.008H11.25v-.008zm3-6.75h.008v.008H14.25v-.008zm0 2.25h.008v.008H14.25V15zm0 2.25h.008v.008H14.25v-.008zm3-6.75h.008v.008H17.25v-.008zm0 2.25h.008v.008H17.25V15zm0 2.25h.008v.008H17.25v-.008zM4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"></path></svg>
+          <span>Tính toán Lương</span>
+        </button>
+        <button @click="sendPayslipsToAll" class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/25 transition-all cursor-pointer flex items-center justify-center gap-2">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"></path></svg>
+          <span>Gửi Phiếu lương</span>
+        </button>
+      </div>
+    </div>
+  </template>
+
+  <!-- Payroll Data Grid -->
+  <div class="glass-card p-6 rounded-3xl shadow-xl border border-slate-800/80 space-y-5">
+    <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+      <h3 class="text-base font-bold text-white" x-text="`Bảng tổng hợp Lương ${role === 'Employee' ? 'Cá nhân' : 'Hệ thống'}`"></h3>
+      
+      <!-- Month Filter -->
+      <div class="flex gap-2 text-xs">
+        <select x-model="filterMonth" class="px-3 py-2 rounded-xl glass-input bg-slate-900 font-semibold">
+          <option value="All">Tất cả các tháng</option>
+          <template x-for="m in 12" :key="m">
+            <option :value="m" x-text="`Tháng ${m}`"></option>
+          </template>
+        </select>
+      </div>
+    </div>
+
+    <div class="overflow-x-auto rounded-2xl border border-slate-800/80">
+      <table class="w-full text-left text-xs glass-table">
+        <thead>
+          <tr>
+            <th class="p-4 font-bold text-slate-300 uppercase">Chu kỳ</th>
+            <th class="p-4 font-bold text-slate-300 uppercase" x-show="role !== 'Employee'">Nhân viên</th>
+            <th class="p-4 font-bold text-slate-300 uppercase text-right">Tổng Gross</th>
+            <th class="p-4 font-bold text-slate-300 uppercase text-right">Bảo hiểm (10.5%)</th>
+            <th class="p-4 font-bold text-slate-300 uppercase text-right">Thuế TNCN</th>
+            <th class="p-4 font-bold text-slate-300 uppercase text-right">Thực lĩnh (Net)</th>
+            <th class="p-4 font-bold text-slate-300 uppercase">Trạng thái email</th>
+            <th class="p-4 font-bold text-slate-300 uppercase text-center">Phiếu lương</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800/50">
+          <template x-for="slip in filteredPayslips" :key="slip.id">
+            <tr class="hover:bg-slate-800/30 transition-colors">
+              <td class="p-4 font-bold text-white font-mono" x-text="`Tháng ${slip.month}/${slip.year}`"></td>
+              <td class="p-4" x-show="role !== 'Employee'">
+                <p class="font-bold text-white" x-text="slip.employeeName"></p>
+                <p class="text-[10px] text-slate-400 font-mono" x-text="slip.employeeEmail"></p>
+              </td>
+              <td class="p-4 text-right font-semibold text-slate-200" x-text="formatCurrency(slip.totalSalary)"></td>
+              <td class="p-4 text-right font-mono text-rose-400" x-text="`-${formatCurrency(slip.insurance)}`"></td>
+              <td class="p-4 text-right font-mono text-rose-400" x-text="`-${formatCurrency(slip.tax)}`"></td>
+              <td class="p-4 text-right font-extrabold text-emerald-400 text-sm" x-text="formatCurrency(slip.netSalary)"></td>
+              <td class="p-4">
+                <span x-show="slip.sentDate" class="badge-suitable text-[10px] font-bold px-2.5 py-1 rounded-full" x-text="`Đã gửi: ${slip.sentDate.split(' ')[0]}`"></span>
+                <span x-show="!slip.sentDate" class="badge-cancelled text-[10px] font-bold px-2.5 py-1 rounded-full">Chưa gửi email</span>
+              </td>
+              <td class="p-4">
+                <div class="flex justify-center">
+                  <button @click="viewPayslipDetail(slip)" class="px-3 py-1.5 bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-300 rounded-xl text-xs font-bold transition-all cursor-pointer">
+                    Xem Phiếu
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </template>
+          <template x-if="filteredPayslips.length === 0">
+            <tr>
+              <td :colspan="role === 'Employee' ? 7 : 8" class="p-8 text-center text-slate-400 italic">Không có bản ghi lương nào được tìm thấy.</td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- PAYSLIP MODAL DETAIL VIEWER -->
+  <div x-show="showPayslipModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4" x-cloak>
+    <div class="glass-card border border-slate-800 rounded-3xl p-6 md:p-8 max-w-lg w-full space-y-6 shadow-2xl relative">
+      
+      <!-- Payslip Header -->
+      <div class="text-center space-y-1 border-b border-slate-800 pb-4">
+        <h3 class="text-lg font-extrabold text-indigo-400 tracking-wide">PHIẾU LƯƠNG NHÂN VIÊN</h3>
+        <p class="text-xs text-slate-400 font-semibold" x-text="`Chu kỳ thanh toán: Tháng ${activeSlip?.month} / Năm ${activeSlip?.year}`"></p>
+      </div>
+
+      <!-- Employee Info -->
+      <div class="p-4 bg-slate-900/90 rounded-2xl space-y-2.5 text-xs border border-slate-800">
+        <div class="flex justify-between items-center"><span class="text-slate-400">Họ và tên nhân viên:</span><strong class="text-white text-sm" x-text="activeSlip?.employeeName"></strong></div>
+        <div class="flex justify-between items-center"><span class="text-slate-400">Mã Nhân viên:</span><strong class="text-indigo-400 font-mono" x-text="activeSlip?.employeeId"></strong></div>
+        <div class="flex justify-between items-center"><span class="text-slate-400">Email nhận phiếu:</span><strong class="text-slate-300 font-mono" x-text="activeSlip?.employeeEmail"></strong></div>
+      </div>
+
+      <!-- Financial breakdown -->
+      <div class="space-y-3 text-xs">
+        <h4 class="font-bold text-white border-b border-slate-800 pb-2">Chi tiết Thu nhập & Trích trừ Lương</h4>
+        
+        <div class="flex justify-between items-center">
+          <span class="text-slate-400">Tổng thu nhập Gross (CB + PC + OT):</span>
+          <span class="font-bold text-white" x-text="formatCurrency(activeSlip?.totalSalary)"></span>
+        </div>
+        <div class="flex justify-between items-center text-rose-400">
+          <span>Khấu trừ BHXH, BHYT, BHTN (10.5%):</span>
+          <span class="font-bold font-mono" x-text="`-${formatCurrency(activeSlip?.insurance)}`"></span>
+        </div>
+        <div class="p-3 bg-slate-900/60 rounded-xl border border-slate-800 text-[11px] space-y-1 text-slate-400">
+          <div class="flex justify-between"><span>Giảm trừ bản thân (Luật Thuế):</span><span class="font-mono">-11.000.000 đ</span></div>
+          <div class="flex justify-between"><span>Giảm trừ người phụ thuộc:</span><span x-text="`Giảm trừ ${activeSlip?.dependents || 0} NPT`"></span></div>
+        </div>
+        <div class="flex justify-between items-center text-rose-400">
+          <span>Thuế TNCN tạm tính (Biểu lũy tiến):</span>
+          <span class="font-bold font-mono" x-text="`-${formatCurrency(activeSlip?.tax)}`"></span>
+        </div>
+        
+        <div class="p-4 bg-emerald-500/10 border border-emerald-500/30 rounded-2xl flex justify-between items-center text-base font-extrabold mt-4">
+          <span class="text-emerald-400">Thực lĩnh nhận (Net):</span>
+          <span class="text-emerald-400 tracking-tight" x-text="formatCurrency(activeSlip?.netSalary)"></span>
+        </div>
+      </div>
+
+      <div class="flex justify-end gap-3 border-t border-slate-800 pt-5">
+        <button @click="showPayslipModal = false" class="px-5 py-2.5 border border-slate-700/80 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-bold cursor-pointer">Đóng</button>
+        <button @click="printActivePayslip" class="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/25 active:scale-95 transition-all cursor-pointer">In Phiếu lương</button>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<!-- Hidden printing frame for Payslips -->
+<iframe id="payslipPrintIframe" style="display:none;"></iframe>
+
+<script>
+  document.addEventListener('alpine:init', () => {
+    if (!Alpine.store('payrollStateRegistered')) {
+      Alpine.store('payrollStateRegistered', true);
+      
+      Alpine.data('payrollState', () => ({
+        slips: [],
+        calcMonth: new Date().getMonth() + 1,
+        calcYear: new Date().getFullYear(),
+        filterMonth: 'All',
+        showPayslipModal: false,
+        activeSlip: null,
+
+        init() {
+          this.loadPayslips();
+          window.addEventListener('nav-changed', (e) => {
+            if (e.detail === 'payroll') {
+              this.loadPayslips();
+            }
+          });
+        },
+
+        loadPayslips() {
+          const userStr = localStorage.getItem('recruitment_user');
+          if (!userStr) return;
+          const user = JSON.parse(userStr);
+          
+          showLoading('Đang tải danh sách phiếu lương...');
+          runBackend('getPayslips', user.email || user.username, user.role)
+            .then(data => {
+              this.slips = data;
+              hideLoading();
+            })
+            .catch(err => {
+              hideLoading();
+              Swal.fire('Lỗi', 'Không thể tải danh sách phiếu lương: ' + err.message, 'error');
+            });
+        },
+
+        get filteredPayslips() {
+          return this.slips.filter(slip => {
+            const matchesMonth = this.filterMonth === 'All' || String(slip.month) === String(this.filterMonth);
+            return matchesMonth;
+          });
+        },
+
+        runPayrollCalculation() {
+          showLoading(`Đang tính toán lương Tháng ${this.calcMonth}/${this.calcYear}...`);
+          runBackend('calculatePayroll', this.calcMonth, this.calcYear)
+            .then(res => {
+              hideLoading();
+              Swal.fire('Thành công', `Đã hoàn tất tính toán lương cho ${res.count} nhân viên.`, 'success');
+              this.loadPayslips();
+            })
+            .catch(err => {
+              hideLoading();
+              Swal.fire('Lỗi tính lương', err.message, 'error');
+            });
+        },
+
+        sendPayslipsToAll() {
+          Swal.fire({
+            title: 'Gửi Phiếu lương',
+            text: `Bạn có chắc chắn muốn gửi email đính kèm tệp PDF phiếu lương Tháng ${this.calcMonth}/${this.calcYear} tới toàn thể nhân viên?`,
+            icon: 'question',
+            showCancelButton: true,
+            confirmButtonText: 'Có, gửi đi',
+            cancelButtonText: 'Hủy bỏ'
+          }).then((result) => {
+            if (result.isConfirmed) {
+              showLoading('Đang kết xuất PDF và gửi email phiếu lương...');
+              runBackend('sendPayslips', this.calcMonth, this.calcYear)
+                .then(res => {
+                  hideLoading();
+                  Swal.fire('Thành công', `Đã gửi thành công ${res.count} phiếu lương qua email nhân viên.`, 'success');
+                  this.loadPayslips();
+                })
+                .catch(err => {
+                  hideLoading();
+                  Swal.fire('Lỗi gửi mail', err.message, 'error');
+                });
+            }
+          });
+        },
+
+        viewPayslipDetail(slip) {
+          this.activeSlip = slip;
+          this.showPayslipModal = true;
+        },
+
+        printActivePayslip() {
+          const slip = this.activeSlip;
+          if (!slip) return;
+          
+          const printHtml = `
+            <html>
+              <head>
+                <style>
+                  body { font-family: sans-serif; padding: 40px; color: #0f172a; line-height: 1.5; }
+                  .container { max-width: 600px; margin: auto; border: 1px solid #cbd5e1; padding: 30px; border-radius: 12px; }
+                  .title { text-align: center; color: #4f46e5; margin-bottom: 25px; }
+                  .info-table, .financials-table { width: 100%; border-collapse: collapse; margin-bottom: 25px; font-size: 14px; }
+                  .info-table td { padding: 6px 0; }
+                  .financials-table td { padding: 10px 0; border-bottom: 1px solid #f1f5f9; }
+                  .text-right { text-align: right; }
+                  .text-bold { font-weight: bold; }
+                  .text-rose { color: #f43f5e; }
+                  .text-emerald { color: #10b981; }
+                  .net-row { background-color: #f8fafc; font-size: 16px; font-weight: bold; }
+                  .net-row td { padding: 12px 10px; }
+                </style>
+              </head>
+              <body>
+                <div class="container">
+                  <div class="title">
+                    <h2>PHIẾU LƯƠNG NHÂN VIÊN</h2>
+                    <p style="color: #64748b; font-size: 13px;">Tháng ${slip.month} / Năm ${slip.year}</p>
+                  </div>
+                  <hr style="border: 0; border-top: 1px solid #e2e8f0; margin-bottom: 20px;">
+                  <table class="info-table">
+                    <tr><td>Họ và tên:</td><td class="text-right text-bold">${slip.employeeName}</td></tr>
+                    <tr><td>Mã Nhân viên:</td><td class="text-right text-bold">${slip.employeeId}</td></tr>
+                    <tr><td>Email nhận:</td><td class="text-right text-bold">${slip.employeeEmail}</td></tr>
+                  </table>
+                  <h4 style="border-bottom: 2px solid #f1f5f9; padding-bottom: 8px;">Chi tiết các khoản</h4>
+                  <table class="financials-table">
+                    <tr><td>Tổng lương Gross:</td><td class="text-right">${this.formatCurrency(slip.totalSalary)}</td></tr>
+                    <tr class="text-rose"><td>Khấu trừ Bảo hiểm (10.5%):</td><td class="text-right">-${this.formatCurrency(slip.insurance)}</td></tr>
+                    <tr class="text-rose"><td>Thuế TNCN tạm tính:</td><td class="text-right">-${this.formatCurrency(slip.tax)}</td></tr>
+                    <tr class="net-row text-emerald">
+                      <td>Thực lĩnh (Net):</td>
+                      <td class="text-right">${this.formatCurrency(slip.netSalary)}</td>
+                    </tr>
+                  </table>
+                  <p style="text-align: center; color: #64748b; font-size: 11px; font-style: italic; margin-top: 30px;">
+                    Phiếu lương được in tự động từ hệ thống RecruitFlow HRM.
+                  </p>
+                </div>
+              </body>
+            </html>
+          `;
+          
+          const iframe = document.getElementById('payslipPrintIframe');
+          if (iframe) {
+            const doc = iframe.contentDocument || iframe.contentWindow.document;
+            doc.open();
+            doc.write(printHtml);
+            doc.close();
+            setTimeout(() => {
+              iframe.contentWindow.focus();
+              iframe.contentWindow.print();
+            }, 500);
+          }
+        },
+
+        formatCurrency(val) {
+          if (!val) return '0 VND';
+          return Number(val).toLocaleString('vi-VN') + ' VND';
+        }
+      }));
+    }
+  });
+</script>

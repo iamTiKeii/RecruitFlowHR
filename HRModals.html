@@ -1,0 +1,440 @@
+<!-- Modal: Preview CV & Candidate Details (2 Columns) -->
+<div id="modal-preview-cv"
+  class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-40 hidden flex items-center justify-center p-4">
+  <div
+    class="glass-card max-w-6xl w-full h-[88vh] rounded-3xl shadow-2xl flex flex-col border border-slate-800/80 overflow-hidden">
+    <!-- Header -->
+    <div class="p-5 border-b border-slate-800 flex items-center justify-between bg-slate-900/60">
+      <div class="flex items-center gap-2">
+        <h3 class="text-sm font-extrabold text-white uppercase tracking-wider" x-text="role === 'Interviewer' ? 'Chi tiết hồ sơ ứng viên' : 'Chi tiết hồ sơ & Xem trước CV'">Chi tiết hồ sơ & Xem trước CV</h3>
+        <span class="px-2 py-0.5 rounded text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">CV Preview</span>
+      </div>
+      <button onclick="closeCvPreview()" class="text-slate-400 hover:text-white p-1 rounded-lg">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Content (2 Columns) -->
+    <div class="flex-1 flex flex-col md:flex-row overflow-hidden">
+      <!-- Left: Form editor & Candidate Email -->
+      <div class="w-full md:w-5/12 p-6 overflow-y-auto space-y-4 border-r border-slate-800 text-xs text-left">
+        <h4 class="font-bold text-indigo-400 uppercase tracking-wider text-xs mb-3">Thông tin chi tiết ứng viên</h4>
+        
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Họ và tên / Full Name</label>
+          <input type="text" id="preview-input-name" class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-semibold">
+        </div>
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Ngày sinh / Date of Birth</label>
+          <input type="date" id="preview-input-dob" class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-mono">
+        </div>
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Vị trí ứng tuyển / Position</label>
+          <input type="text" id="preview-input-subject" class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-semibold">
+        </div>
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Số điện thoại / Phone</label>
+          <input type="text" id="preview-input-phone" class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-mono">
+        </div>
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Địa chỉ Email</label>
+          <input type="email" id="preview-input-email" class="w-full px-3.5 py-2.5 rounded-xl glass-input text-xs font-mono">
+        </div>
+
+        <!-- Candidate original email body (RichText) -->
+        <div class="space-y-2 pt-4 border-t border-slate-800">
+          <label class="block font-bold text-slate-300 uppercase tracking-wider">Nội dung thư ứng tuyển từ Gmail</label>
+          <div class="w-full rounded-2xl border border-slate-800 bg-slate-900/80 p-3 overflow-hidden">
+            <div id="preview-email-body-display" class="text-xs leading-relaxed text-slate-200" style="min-height: 180px;"></div>
+          </div>
+        </div>
+
+        <div x-show="role === 'Admin' || role === 'HR'" class="pt-4 flex justify-between gap-3 border-t border-slate-800">
+          <button id="preview-btn-suitable" onclick="previewClassify('Suitable')"
+            class="flex-1 py-3 rounded-xl text-center bg-emerald-600 hover:bg-emerald-500 font-bold text-white transition-all shadow-md shadow-emerald-600/20 cursor-pointer">
+            Lên lịch Phỏng vấn
+          </button>
+          <button id="preview-btn-unsuitable" onclick="previewClassify('Unsuitable')"
+            class="flex-1 py-3 rounded-xl text-center bg-rose-600 hover:bg-rose-500 font-bold text-white transition-all shadow-md shadow-rose-600/20 cursor-pointer">
+            Không đạt
+          </button>
+        </div>
+      </div>
+
+      <!-- Right: PDF iframe preview -->
+      <div class="w-full md:w-7/12 h-full relative bg-slate-900/90">
+        <iframe id="cv-iframe" class="w-full h-full border-0 hidden"></iframe>
+        <div id="cv-no-preview" class="absolute inset-0 flex flex-col items-center justify-center p-6 text-center">
+          <p class="text-xs text-slate-400" id="preview-no-file-text">Không có tệp hiển thị xem trước hoặc định dạng chưa hỗ trợ.</p>
+          <a id="preview-download-btn" href="#" target="_blank"
+            class="mt-4 px-5 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-bold text-white transition-all shadow-lg shadow-indigo-600/25">
+            Mở xem bằng Google Drive
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer -->
+    <div class="p-4 border-t border-slate-800 flex justify-end gap-3 bg-slate-900/60">
+      <button x-show="role === 'Admin' || role === 'HR'" onclick="savePreviewInfo()"
+        class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 rounded-xl text-xs font-bold text-white transition-all shadow-md cursor-pointer">
+        Lưu & Đóng
+      </button>
+      <button x-show="role === 'Interviewer'" onclick="closeCvPreview()"
+        class="px-6 py-2.5 bg-slate-800 hover:bg-slate-700 rounded-xl text-xs font-bold text-slate-300 transition-all cursor-pointer">
+        Đóng lại
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Suitable Classification / Planning Phỏng vấn -->
+<div id="modal-suitable"
+  class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-40 hidden flex items-center justify-center p-4">
+  <div
+    class="glass-card max-w-2xl w-full p-6 md:p-8 rounded-3xl shadow-2xl space-y-6 border border-slate-800 text-left">
+    <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+      <h3 class="text-base font-extrabold text-white">Lên lịch hẹn phỏng vấn ứng viên</h3>
+      <button onclick="closeModal('suitable')" class="text-slate-400 hover:text-white p-1">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+      <input type="hidden" id="suitable-cand-id">
+      <div>
+        <label for="interview-interviewer-select"
+          class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Người phỏng vấn / Interviewer</label>
+        <select id="interview-interviewer-select" class="w-full px-4 py-3 rounded-xl glass-input bg-slate-900 font-semibold">
+          <!-- Populated by JS -->
+        </select>
+      </div>
+      <div>
+        <label for="interview-date" class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Ngày & Giờ phỏng vấn</label>
+        <input type="datetime-local" id="interview-date" onchange="generateEmailPreview('interview')"
+          class="w-full px-4 py-3 rounded-xl glass-input font-mono">
+      </div>
+      <div class="sm:col-span-2">
+        <label for="interview-location" class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Địa điểm / Link cuộc họp</label>
+        <div class="flex gap-2">
+          <input type="text" id="interview-location" value="Google Meet" onkeyup="generateEmailPreview('interview')"
+            class="flex-1 px-4 py-3 rounded-xl glass-input">
+          <button onclick="generateMeetLinkForPlanning()"
+            class="px-4 py-3 bg-indigo-600 hover:bg-indigo-500 rounded-xl font-bold text-white transition-all flex items-center gap-2 shadow-md shadow-indigo-600/20 cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+              <path stroke-linecap="round" stroke-linejoin="round"
+                d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z">
+              </path>
+            </svg>
+            Tạo Meet Link
+          </button>
+        </div>
+      </div>
+      <div class="sm:col-span-2">
+        <label for="suitable-form-select" class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Đính kèm Form khảo sát</label>
+        <select id="suitable-form-select" onchange="generateEmailPreview('interview')"
+          class="w-full px-4 py-3 rounded-xl glass-input bg-slate-900 font-semibold">
+          <!-- Populated by JS -->
+        </select>
+      </div>
+      <div class="sm:col-span-2">
+        <label for="interview-note" class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Ghi chú gửi ứng viên</label>
+        <textarea id="interview-note" rows="2" onkeyup="generateEmailPreview('interview')"
+          class="w-full px-4 py-3 rounded-xl glass-input"></textarea>
+      </div>
+    </div>
+
+    <!-- Invited warning banner -->
+    <div id="invited-warning-banner"
+      class="hidden p-4 bg-amber-500/15 border border-amber-500/30 rounded-2xl text-xs text-amber-300 flex items-start gap-3">
+      <svg class="w-5 h-5 text-amber-400 shrink-0" fill="none" stroke="currentColor" stroke-width="2"
+        viewBox="0 0 24 24">
+        <path stroke-linecap="round" stroke-linejoin="round"
+          d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z">
+        </path>
+      </svg>
+      <div>
+        <strong>Lưu ý:</strong> Ứng viên này đã được gửi thư mời phỏng vấn trước đó. Tùy chọn gửi email tự động tắt để tránh trùng lặp.
+      </div>
+    </div>
+
+    <!-- Send email toggle -->
+    <div id="send-email-checkbox-wrapper" class="flex items-center gap-2 text-xs">
+      <input type="checkbox" id="planning-send-email-checkbox" onchange="togglePlanningEmailField()" checked
+        class="rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-600 w-4 h-4">
+      <label for="planning-send-email-checkbox" class="font-bold text-slate-200">Gửi email mời phỏng vấn đến ứng viên</label>
+    </div>
+
+    <!-- Preview Email Body -->
+    <div id="planning-email-preview-wrapper" class="space-y-2 text-xs">
+      <label class="block font-bold text-slate-300 uppercase tracking-wider">Xem trước nội dung email</label>
+      <div id="suitable-email-preview" class="w-full rounded-2xl glass-input overflow-hidden" style="min-height: 180px;">
+      </div>
+    </div>
+
+    <div class="flex items-center justify-end gap-3 border-t border-slate-800 pt-4">
+      <button onclick="closeModal('suitable')"
+        class="py-2.5 px-5 rounded-xl text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">
+        Hủy bỏ
+      </button>
+      <button onclick="submitSuitablePlanning()"
+        class="py-2.5 px-6 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/25 active:scale-95 transition-all cursor-pointer">
+        Xác nhận & Lưu Lịch
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Unsuitable Classification -->
+<div id="modal-unsuitable"
+  class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-40 hidden flex items-center justify-center p-4">
+  <div
+    class="glass-card max-w-2xl w-full p-6 md:p-8 rounded-3xl shadow-2xl space-y-6 border border-slate-800 text-left">
+    <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+      <h3 class="text-base font-extrabold text-white" data-i18n="modal-rej-title">Gửi thông báo từ chối ứng tuyển</h3>
+      <button onclick="closeModal('unsuitable')" class="text-slate-400 hover:text-white p-1">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <div class="space-y-4 text-xs">
+      <input type="hidden" id="unsuitable-cand-id">
+      <div>
+        <label for="rejection-templates-select"
+          class="block font-bold text-slate-300 uppercase tracking-wider mb-2" data-i18n="modal-rej-canned">Lý do mẫu</label>
+        <select id="rejection-templates-select" onchange="applyCannedReason(); generateEmailPreview('rejection');"
+          class="w-full px-4 py-3 rounded-xl glass-input bg-slate-900 font-semibold">
+          <option class="lang-option-default" value="">-- Chọn lý do mẫu --</option>
+          <option class="lang-option-tech" value="tech">Yêu cầu công nghệ chưa khớp</option>
+          <option class="lang-option-exp" value="exp">Thiếu số năm kinh nghiệm</option>
+          <option class="lang-option-loc" value="loc">Ràng buộc địa lý</option>
+          <option class="lang-option-budget" value="budget">Vượt ngân sách vị trí</option>
+          <option class="lang-option-polite" value="polite">Chọn hồ sơ phù hợp hơn (Lịch sự)</option>
+        </select>
+      </div>
+      <div>
+        <label for="rejection-reason" class="block font-bold text-slate-300 uppercase tracking-wider mb-2"
+          data-i18n="modal-rej-custom">Chi tiết phản hồi lý do</label>
+        <textarea id="rejection-reason" rows="2" onkeyup="generateEmailPreview('rejection')"
+          class="w-full px-4 py-3 rounded-xl glass-input"></textarea>
+      </div>
+    </div>
+
+    <!-- Preview Email Body -->
+    <div class="space-y-2 text-xs">
+      <label class="block font-bold text-slate-300 uppercase tracking-wider">Xem trước thư từ chối</label>
+      <div id="unsuitable-email-preview" class="w-full rounded-2xl glass-input overflow-hidden"
+        style="min-height: 180px;"></div>
+    </div>
+
+    <div class="flex items-center justify-end gap-3 border-t border-slate-800 pt-4">
+      <button onclick="closeModal('unsuitable')"
+        class="py-2.5 px-5 rounded-xl text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer"
+        data-i18n="modal-rej-cancel">Hủy bỏ</button>
+      <button onclick="submitUnsuitable()"
+        class="py-2.5 px-6 rounded-xl text-xs font-bold text-white bg-rose-600 hover:bg-rose-500 shadow-lg shadow-rose-600/25 active:scale-95 transition-all cursor-pointer"
+        data-i18n="modal-rej-submit">Xác nhận & Gửi thư từ chối</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Offer Details & Print Workflow -->
+<div id="modal-offer"
+  class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-40 hidden flex items-center justify-center p-4">
+  <div
+    class="glass-card max-w-2xl w-full p-6 md:p-8 rounded-3xl shadow-2xl space-y-6 border border-slate-800 text-left">
+    <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+      <h3 class="text-base font-extrabold text-white">Thiết lập thư mời nhận việc (Offer Letter)</h3>
+      <button onclick="closeModal('offer')" class="text-slate-400 hover:text-white p-1">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Interviewer Recommendation Card -->
+    <div id="interviewer-recommendation-card"
+      class="bg-indigo-500/10 border border-indigo-500/30 rounded-2xl p-4 space-y-2 hidden">
+      <div class="flex items-center gap-2">
+        <span class="inline-flex items-center justify-center p-1 bg-indigo-500/20 text-indigo-300 rounded-lg">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z">
+            </path>
+          </svg>
+        </span>
+        <h4 class="text-xs font-bold text-white uppercase tracking-wider">Đề xuất từ Người phỏng vấn (Interviewer)</h4>
+      </div>
+      <div class="grid grid-cols-2 gap-4 text-xs">
+        <div>
+          <span class="text-slate-400">Lương đề xuất: </span>
+          <span id="recommend-salary" class="font-extrabold text-emerald-400">N/A</span>
+        </div>
+        <div>
+          <span class="text-slate-400">Ngày bắt đầu đề xuất: </span>
+          <span id="recommend-start-date" class="font-semibold text-slate-200 font-mono">N/A</span>
+        </div>
+      </div>
+      <div class="text-xs text-slate-300 pt-1 border-t border-slate-800">
+        <span class="text-slate-400 font-semibold">Nhận xét phỏng vấn: </span>
+        <p id="recommend-notes"
+          class="mt-1 italic text-slate-200 bg-slate-900/60 p-3 rounded-xl border border-slate-800 whitespace-pre-wrap">
+        </p>
+      </div>
+    </div>
+
+    <div class="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+      <input type="hidden" id="offer-cand-id">
+      <div>
+        <label for="offer-gross" class="block font-bold text-slate-300 uppercase tracking-wider mb-1.5">Lương Gross</label>
+        <div class="flex gap-2">
+          <input type="text" id="offer-gross" placeholder="e.g. 25,000,000"
+            oninput="formatCurrencyInput(this); generateEmailPreview('offer')"
+            class="flex-1 px-4 py-3 rounded-xl glass-input font-bold text-indigo-300">
+          <select id="offer-currency-gross" onchange="syncCurrencies(this.value); generateEmailPreview('offer')"
+            class="px-3 py-3 rounded-xl glass-input bg-slate-900 w-24 font-bold">
+            <option value="VND">VND</option>
+            <option value="USD">USD</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label for="offer-net" class="block font-bold text-slate-300 uppercase tracking-wider mb-1.5">Lương Net</label>
+        <div class="flex gap-2">
+          <input type="text" id="offer-net" placeholder="e.g. 21,500,000"
+            oninput="formatCurrencyInput(this); generateEmailPreview('offer')"
+            class="flex-1 px-4 py-3 rounded-xl glass-input font-bold text-emerald-300">
+          <select id="offer-currency-net" onchange="syncCurrencies(this.value); generateEmailPreview('offer')"
+            class="px-3 py-3 rounded-xl glass-input bg-slate-900 w-24 font-bold">
+            <option value="VND">VND</option>
+            <option value="USD">USD</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label for="offer-probation" class="block font-bold text-slate-300 uppercase tracking-wider mb-1.5">Lương Thử Việc (Probation)</label>
+        <div class="flex gap-2">
+          <input type="text" id="offer-probation" placeholder="e.g. 18,000,000"
+            oninput="formatCurrencyInput(this); generateEmailPreview('offer')"
+            class="flex-1 px-4 py-3 rounded-xl glass-input font-bold">
+          <select id="offer-currency-probation" onchange="syncCurrencies(this.value); generateEmailPreview('offer')"
+            class="px-3 py-3 rounded-xl glass-input bg-slate-900 w-24 font-bold">
+            <option value="VND">VND</option>
+            <option value="USD">USD</option>
+          </select>
+        </div>
+      </div>
+      <div>
+        <label for="offer-start-date" class="block font-bold text-slate-300 uppercase tracking-wider mb-1.5">Ngày nhận việc / Start Date</label>
+        <input type="date" id="offer-start-date" onchange="generateEmailPreview('offer')"
+          class="w-full px-4 py-3 rounded-xl glass-input font-mono">
+      </div>
+      <div>
+        <label for="offer-location" class="block font-bold text-slate-300 uppercase tracking-wider mb-1.5">Địa điểm làm việc</label>
+        <input type="text" id="offer-location" value="Hội sở chính" onkeyup="generateEmailPreview('offer')"
+          class="w-full px-4 py-3 rounded-xl glass-input">
+      </div>
+      <div>
+        <label for="offer-expiry-date" class="block font-bold text-slate-300 uppercase tracking-wider mb-1.5">Hạn phản hồi Offer</label>
+        <input type="date" id="offer-expiry-date" onchange="generateEmailPreview('offer')"
+          class="w-full px-4 py-3 rounded-xl glass-input font-mono">
+      </div>
+    </div>
+
+    <!-- Send email toggle -->
+    <div class="flex items-center gap-2 text-xs">
+      <input type="checkbox" id="offer-send-email-checkbox" onchange="toggleOfferEmailField()" checked
+        class="rounded border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-600 w-4 h-4">
+      <label for="offer-send-email-checkbox" class="font-bold text-slate-200">Gửi email kèm tệp PDF Offer Letter tự động</label>
+    </div>
+
+    <!-- Preview Offer Email Body -->
+    <div id="offer-email-preview-wrapper" class="space-y-2 text-xs">
+      <label class="block font-bold text-slate-300 uppercase tracking-wider">Xem trước thư Offer Letter</label>
+      <div id="offer-email-preview" class="w-full rounded-2xl glass-input overflow-hidden" style="min-height: 180px;">
+      </div>
+    </div>
+
+    <div class="flex items-center justify-end gap-3 border-t border-slate-800 pt-4 text-xs">
+      <button onclick="closeModal('offer')"
+        class="py-2.5 px-5 rounded-xl font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">Hủy bỏ</button>
+      <button onclick="submitOffer()"
+        class="py-2.5 px-6 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/25 active:scale-95 transition-all cursor-pointer">Lưu Offer & Gửi thư</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: View Email Content Plain Body -->
+<div id="modal-view-email-content"
+  class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-40 hidden flex items-center justify-center p-4">
+  <div
+    class="glass-card max-w-3xl w-full p-6 md:p-8 rounded-3xl shadow-2xl space-y-6 border border-slate-800 text-left">
+    <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+      <h3 class="text-base font-extrabold text-white flex items-center gap-2">
+        <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round"
+            d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.431 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z">
+          </path>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+        </svg>
+        Nội dung Email Chi tiết
+      </h3>
+      <button onclick="closeModal('view-email-content')" class="text-slate-400 hover:text-white p-1">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <div class="space-y-3 text-xs">
+      <div id="email-content-sender-info"
+        class="text-slate-300 bg-slate-900 p-4 rounded-2xl border border-slate-800 space-y-1 font-mono text-xs">
+        <!-- Populated by JS -->
+      </div>
+      <div id="email-content-body-display"
+        class="w-full max-h-[350px] overflow-y-auto px-4 py-3 rounded-2xl glass-input font-mono text-xs leading-relaxed whitespace-pre-wrap text-slate-200 bg-slate-900/90 border border-slate-800">
+        <!-- Populated by JS -->
+      </div>
+    </div>
+
+    <div class="flex items-center justify-end border-t border-slate-800 pt-4">
+      <button onclick="closeModal('view-email-content')"
+        class="py-2.5 px-6 rounded-xl text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">
+        Đóng lại
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: View Form Response Details -->
+<div id="modal-view-form-response"
+  class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-40 hidden flex items-center justify-center p-4">
+  <div
+    class="glass-card max-w-xl w-full p-6 md:p-8 rounded-3xl shadow-2xl space-y-6 border border-slate-800 text-left">
+    <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+      <h3 class="text-base font-bold text-white">Kết quả khảo sát ứng viên (Google Form)</h3>
+      <button onclick="closeFormResponseModal()" class="text-slate-400 hover:text-white p-1">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path>
+        </svg>
+      </button>
+    </div>
+
+    <!-- Content: dynamically populated question-answer labels -->
+    <div id="form-response-content" class="space-y-4 max-h-[60vh] overflow-y-auto pr-2 text-xs">
+      <!-- populated dynamically -->
+    </div>
+
+    <div class="flex justify-end pt-4 border-t border-slate-800">
+      <button onclick="closeFormResponseModal()"
+        class="py-2.5 px-6 rounded-xl text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">
+        Đóng lại
+      </button>
+    </div>
+  </div>
+</div>

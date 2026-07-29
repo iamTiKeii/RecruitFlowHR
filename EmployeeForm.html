@@ -1,0 +1,363 @@
+<!-- EmployeeForm.html - Add/Edit Employee Modal -->
+<div x-data="employeeFormState" 
+     x-show="show" 
+     @open-employee-modal.window="openModal($event.detail)"
+     class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4" 
+     x-cloak
+     x-transition:enter="transition ease-out duration-200"
+     x-transition:enter-start="opacity-0 scale-95"
+     x-transition:enter-end="opacity-100 scale-100"
+     x-transition:leave="transition ease-in duration-150"
+     x-transition:leave-start="opacity-100 scale-100"
+     x-transition:leave-end="opacity-0 scale-95">
+  
+  <div class="glass-card border border-slate-800 rounded-3xl max-w-2xl w-full shadow-2xl relative flex flex-col max-h-[90vh] overflow-hidden">
+    <!-- Header -->
+    <div class="px-6 py-5 border-b border-slate-800 flex justify-between items-center bg-slate-900/80">
+      <div>
+        <h3 class="text-base font-bold text-white uppercase tracking-wider" x-text="editMode ? 'Cập nhật Thông tin Nhân sự' : 'Thêm Nhân sự Mới'"></h3>
+        <p class="text-xs text-slate-400 mt-0.5" x-text="editMode ? 'Chỉnh sửa thông tin hồ sơ và hợp đồng nhân viên' : 'Khởi tạo hồ sơ nhân sự mới và tự động phân quyền tài khoản'"></p>
+      </div>
+      <button @click="show = false" class="text-slate-400 hover:text-white p-1 rounded-lg transition-colors cursor-pointer">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+
+    <!-- Form Content Scroll Area -->
+    <div class="p-6 overflow-y-auto space-y-6 text-xs flex-1">
+      
+      <!-- Import Candidate Option (Only in Add Mode) -->
+      <div x-show="!editMode && candidates.length > 0" class="p-4 bg-indigo-500/10 border border-indigo-500/30 rounded-2xl space-y-2">
+        <label class="block font-bold text-indigo-300 uppercase tracking-wider text-[11px]">Nhập từ ứng viên trúng tuyển (Passed/Interviewed)</label>
+        <div class="flex gap-2">
+          <select x-model="selectedCandidateId" @change="importCandidate($event.target.value)" class="flex-1 px-4 py-2.5 text-xs rounded-xl glass-input bg-slate-900 font-semibold">
+            <option value="">-- Chọn ứng viên cần nhập dữ liệu --</option>
+            <template x-for="cand in candidates" :key="cand.id">
+              <option :value="cand.id" x-text="`${cand.fullName} (${cand.email})`"></option>
+            </template>
+          </select>
+        </div>
+      </div>
+
+      <!-- Information Grid -->
+      <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <!-- Full Name -->
+        <div class="col-span-1 md:col-span-2">
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Họ và tên nhân sự <span class="text-rose-400">*</span></label>
+          <input type="text" x-model="form.fullName" placeholder="Nguyễn Văn A" class="w-full px-4 py-3 text-xs rounded-xl glass-input font-bold">
+        </div>
+
+        <!-- Gender -->
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Giới tính</label>
+          <select x-model="form.gender" class="w-full px-4 py-3 text-xs rounded-xl glass-input bg-slate-900 font-semibold">
+            <option value="Nam">Nam</option>
+            <option value="Nữ">Nữ</option>
+            <option value="Khác">Khác</option>
+          </select>
+        </div>
+
+        <!-- Phone Number -->
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Số điện thoại</label>
+          <input type="tel" x-model="form.phone" placeholder="0901234567" class="w-full px-4 py-3 text-xs rounded-xl glass-input font-mono">
+        </div>
+
+        <!-- Email -->
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Địa chỉ Email <span class="text-rose-400">*</span></label>
+          <input type="email" x-model="form.email" :disabled="editMode" placeholder="email@company.com" class="w-full px-4 py-3 text-xs rounded-xl glass-input font-mono disabled:opacity-50 disabled:cursor-not-allowed">
+        </div>
+
+        <!-- Status -->
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Trạng thái làm việc</label>
+          <select x-model="form.status" class="w-full px-4 py-3 text-xs rounded-xl glass-input bg-slate-900 font-semibold">
+            <option value="Đang làm">Đang làm (Active)</option>
+            <option value="Đã nghỉ">Đã nghỉ (Resigned)</option>
+          </select>
+        </div>
+
+        <!-- Department -->
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Phòng ban</label>
+          <select x-model="form.department" class="w-full px-4 py-3 text-xs rounded-xl glass-input bg-slate-900 font-semibold">
+            <option value="">-- Chọn phòng ban --</option>
+            <template x-for="dept in departments" :key="dept.code">
+              <option :value="dept.name" x-text="dept.name"></option>
+            </template>
+          </select>
+        </div>
+
+        <!-- Position -->
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Chức vụ</label>
+          <select x-model="form.position" class="w-full px-4 py-3 text-xs rounded-xl glass-input bg-slate-900 font-semibold">
+            <option value="">-- Chọn chức vụ --</option>
+            <template x-for="pos in positions" :key="pos.code">
+              <option :value="pos.name" x-text="pos.name"></option>
+            </template>
+          </select>
+        </div>
+
+        <!-- Basic Salary -->
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Lương cơ bản (VND)</label>
+          <input type="text" :value="getFormattedValue('basicSalary')" @input="formatMoneyInput('basicSalary', $event)" class="w-full px-4 py-3 text-xs rounded-xl glass-input font-bold text-right text-indigo-300">
+        </div>
+
+        <!-- Social Insurance Salary -->
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Lương đóng BHXH (VND)</label>
+          <input type="text" :value="getFormattedValue('socialInsuranceSalary')" @input="formatMoneyInput('socialInsuranceSalary', $event)" class="w-full px-4 py-3 text-xs rounded-xl glass-input font-bold text-right text-indigo-300">
+        </div>
+
+        <!-- Probation Salary -->
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Lương thử việc (VND)</label>
+          <input type="text" :value="getFormattedValue('probationSalary')" @input="formatMoneyInput('probationSalary', $event)" class="w-full px-4 py-3 text-xs rounded-xl glass-input font-bold text-right">
+        </div>
+
+        <!-- Dependents -->
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Số người phụ thuộc (Thuế TNCN)</label>
+          <input type="number" min="0" x-model.number="form.dependents" class="w-full px-4 py-3 text-xs rounded-xl glass-input font-bold text-right">
+        </div>
+
+        <!-- Total Leave Days -->
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Quỹ phép năm (Số ngày)</label>
+          <input type="number" min="0" x-model.number="form.totalLeaveDays" class="w-full px-4 py-3 text-xs rounded-xl glass-input font-bold text-right">
+        </div>
+
+        <!-- Allowances Multi-select -->
+        <div class="col-span-1 md:col-span-2">
+          <label class="block font-bold text-slate-300 mb-2 uppercase tracking-wider text-[11px]">Các khoản phụ cấp áp dụng</label>
+          <div class="flex flex-wrap gap-4 p-4 border border-slate-800 rounded-2xl bg-slate-900/60">
+            <template x-for="allow in allowances" :key="allow.code">
+              <label class="flex items-center gap-2 cursor-pointer text-slate-300 font-semibold">
+                <input type="checkbox" :value="allow.code" x-model="form.selectedAllowances" class="rounded text-indigo-600 bg-slate-900 border-slate-700 w-4 h-4">
+                <span x-text="`${allow.name} (${Number(allow.value).toLocaleString()}đ)`"></span>
+              </label>
+            </template>
+          </div>
+        </div>
+
+        <!-- Probation Start Date -->
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Ngày bắt đầu thử việc</label>
+          <input type="date" x-model="form.probationStartDate" class="w-full px-4 py-3 text-xs rounded-xl glass-input font-mono">
+        </div>
+
+        <!-- Official Start Date -->
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Ngày bắt đầu chính thức</label>
+          <input type="date" x-model="form.officialStartDate" class="w-full px-4 py-3 text-xs rounded-xl glass-input font-mono">
+        </div>
+
+        <!-- Contract Expiry Date -->
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Ngày hết hạn hợp đồng</label>
+          <input type="date" x-model="form.contractExpiryDate" class="w-full px-4 py-3 text-xs rounded-xl glass-input font-mono">
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Actions Footer -->
+    <div class="px-6 py-4 border-t border-slate-800 flex justify-end gap-3 bg-slate-900/80">
+      <button @click="show = false" :disabled="loading" class="px-5 py-2.5 border border-slate-700/80 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-bold transition-all cursor-pointer disabled:opacity-50">Hủy bỏ</button>
+      <button @click="submit" :disabled="loading" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/25 active:scale-95 transition-all disabled:opacity-50 flex items-center gap-2 cursor-pointer">
+        <svg x-show="loading" class="animate-spin h-4 w-4 text-white" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
+        <span x-text="loading ? 'Đang lưu...' : 'Lưu thông tin nhân sự'"></span>
+      </button>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  document.addEventListener('alpine:init', () => {
+    Alpine.data('employeeFormState', () => ({
+      show: false,
+      editMode: false,
+      loading: false,
+      
+      departments: [],
+      positions: [],
+      allowances: [],
+      candidates: [],
+      
+      selectedCandidateId: '',
+      
+      form: {
+        id: '',
+        fullName: '',
+        gender: 'Nam',
+        email: '',
+        phone: '',
+        department: '',
+        position: '',
+        basicSalary: 0,
+        probationSalary: 0,
+        socialInsuranceSalary: 0,
+        dependents: 0,
+        totalLeaveDays: 12,
+        selectedAllowances: [],
+        probationStartDate: '',
+        officialStartDate: '',
+        contractExpiryDate: '',
+        status: 'Đang làm',
+        candidateId: ''
+      },
+      
+      init() {
+        this.loadFormData();
+      },
+      
+      loadFormData() {
+        runBackend('getEmployeeFormData')
+          .then(res => {
+            this.departments = res.departments || [];
+            this.positions = res.positions || [];
+            this.allowances = res.allowances || [];
+            this.candidates = res.candidates || [];
+          })
+          .catch(err => {
+            console.error("Error loading employee form data:", err);
+          });
+      },
+      
+      openModal(detail) {
+        this.loadFormData();
+        this.selectedCandidateId = '';
+        
+        if (detail && detail.mode === 'edit') {
+          this.editMode = true;
+          var emp = detail.employee;
+          
+          var allowanceList = [];
+          if (emp.allowances) {
+            allowanceList = emp.allowances.split(',').map(s => s.trim());
+          }
+          
+          this.form = {
+            id: emp.id || '',
+            fullName: emp.fullName || '',
+            gender: emp.gender || 'Nam',
+            email: emp.email || '',
+            phone: emp.phone || '',
+            department: emp.department || '',
+            position: emp.position || '',
+            basicSalary: emp.basicSalary || 0,
+            probationSalary: emp.probationSalary || 0,
+            socialInsuranceSalary: emp.socialInsuranceSalary || emp.basicSalary || 0,
+            dependents: emp.dependents || 0,
+            totalLeaveDays: emp.totalLeaveDays !== undefined ? emp.totalLeaveDays : 12,
+            selectedAllowances: allowanceList,
+            probationStartDate: emp.probationStartDate || '',
+            officialStartDate: emp.officialStartDate || '',
+            contractExpiryDate: emp.contractExpiryDate || '',
+            status: emp.status || 'Đang làm',
+            candidateId: ''
+          };
+        } else {
+          this.editMode = false;
+          this.form = {
+            id: '',
+            fullName: '',
+            gender: 'Nam',
+            email: '',
+            phone: '',
+            department: '',
+            position: '',
+            basicSalary: 0,
+            probationSalary: 0,
+            socialInsuranceSalary: 0,
+            dependents: 0,
+            totalLeaveDays: 12,
+            selectedAllowances: [],
+            probationStartDate: '',
+            officialStartDate: '',
+            contractExpiryDate: '',
+            status: 'Đang làm',
+            candidateId: ''
+          };
+        }
+        this.show = true;
+      },
+      
+      importCandidate(candId) {
+        if (!candId) return;
+        var cand = this.candidates.find(c => c.id === candId);
+        if (cand) {
+          this.form.fullName = cand.fullName || '';
+          this.form.email = cand.email || '';
+          this.form.phone = cand.phone || '';
+          this.form.basicSalary = cand.basicSalary || 0;
+          this.form.probationSalary = cand.probationSalary || 0;
+          this.form.candidateId = cand.id;
+          showToast('Đã nhập thông tin từ ứng viên: ' + cand.fullName, 'success');
+        }
+      },
+      
+      formatMoneyInput(field, event) {
+        let val = event.target.value.replace(/\D/g, "");
+        if (val) {
+          this.form[field] = parseInt(val, 10);
+        } else {
+          this.form[field] = 0;
+        }
+      },
+      
+      getFormattedValue(field) {
+        return Number(this.form[field] || 0).toLocaleString('vi-VN');
+      },
+      
+      submit() {
+        if (!this.form.fullName.trim()) {
+          Swal.fire('Chú ý', 'Vui lòng điền Họ tên nhân viên.', 'warning');
+          return;
+        }
+        if (!this.form.email.trim()) {
+          Swal.fire('Chú ý', 'Vui lòng điền Email nhân viên.', 'warning');
+          return;
+        }
+        var emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+        if (!emailRegex.test(this.form.email.trim())) {
+          Swal.fire('Chú ý', 'Email không hợp lệ.', 'warning');
+          return;
+        }
+        
+        var payload = { ...this.form };
+        payload.allowances = this.form.selectedAllowances.join(',');
+        
+        this.loading = true;
+        showLoading(this.editMode ? 'Đang cập nhật nhân viên...' : 'Đang lưu nhân viên...');
+        
+        var action = this.editMode ? 'updateEmployee' : 'addEmployee';
+        
+        runBackend(action, payload)
+          .then(res => {
+            this.loading = false;
+            hideLoading();
+            this.show = false;
+            Swal.fire({
+              title: 'Thành công',
+              text: this.editMode ? 'Cập nhật thông tin nhân sự thành công!' : 'Nhân viên đã được tạo kèm hồ sơ chi tiết',
+              icon: 'success',
+              timer: 1500,
+              showConfirmButton: false
+            });
+            
+            window.dispatchEvent(new CustomEvent('employee-updated'));
+          })
+          .catch(err => {
+            this.loading = false;
+            hideLoading();
+            Swal.fire('Lỗi', 'Không thể lưu nhân sự: ' + err.message, 'error');
+          });
+      }
+    }));
+  });
+</script>

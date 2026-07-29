@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en" class="dark">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>RecruitFlow HRM Suite</title>
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      darkMode: 'class',
+      theme: {
+        extend: {
+          colors: {
+            brand: {
+              50: '#eef2ff',
+              100: '#e0e7ff',
+              500: '#6366f1',
+              600: '#4f46e5',
+              700: '#4338ca',
+            }
+          }
+        }
+      }
+    }
+  </script>
+  <!-- Immediately apply theme class to prevent FOUC -->
+  <script>
+    (function() {
+      const savedTheme = localStorage.getItem('theme') || 'dark';
+      if (savedTheme === 'dark') {
+        document.documentElement.classList.add('dark');
+      } else {
+        document.documentElement.classList.remove('dark');
+      }
+    })();
+  </script>
+  <!-- Google Fonts: Plus Jakarta Sans -->
+  <link href="https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+  <!-- Chart.js CDN for interactive analytics charts -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- html5-qrcode for secure camera QR scan -->
+  <script src="https://unpkg.com/html5-qrcode"></script>
+  <!-- Quill CSS & JS -->
+  <link href="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.snow.css" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/quill@2.0.2/dist/quill.js"></script>
+  <!-- SweetAlert2 -->
+  <script src="https://cdn.jsdelivr.net/npm/sweetalert2@11"></script>
+  <!-- Alpine.js CDN for dynamic RBAC routing -->
+  <script src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js" defer></script>
+  
+  <!-- CSS Design System -->
+  <?!= include('Styles'); ?>
+</head>
+<body x-data="appState" x-cloak :style="(isLoggedIn && (activeTab === 'recruitment' || activeTab === 'attendance')) ? 'padding-top: 108px;' : 'padding-top: 64px;'" class="bg-slate-950 text-slate-100 dark:bg-slate-950 dark:text-slate-100 font-sans antialiased min-h-screen flex flex-col relative overflow-x-hidden transition-colors duration-200">
+
+  <!-- Global Toast Notification Container -->
+  <div id="toastContainer" class="fixed bottom-6 right-6 flex flex-col gap-3 z-50 pointer-events-none"></div>
+
+  <!-- Global Spinner & Action Overlay -->
+  <div id="loadingOverlay" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center hidden opacity-0 transition-all duration-300">
+    <div class="flex flex-col items-center gap-4 p-8 glass-card rounded-3xl shadow-2xl border border-slate-800/80 max-w-sm text-center">
+      <div class="relative flex items-center justify-center">
+        <div class="animate-spin rounded-full h-14 w-14 border-4 border-indigo-500/20 border-t-indigo-500 shadow-xl"></div>
+        <div class="absolute w-6 h-6 bg-indigo-600/30 rounded-full blur-md animate-ping"></div>
+      </div>
+      <div>
+        <p class="text-sm font-bold text-white tracking-wide" id="loadingText">Đang xử lý hệ thống...</p>
+        <p class="text-[11px] text-slate-400 mt-1">Vui lòng chờ trong giây lát</p>
+      </div>
+    </div>
+  </div>
+
+  <!-- App-Level Security Login Card -->
+  <?!= include('Login'); ?>
+
+  <!-- Top Navbar & Navigation Bar -->
+  <?!= include('Navbar'); ?>
+
+  <!-- Main View Frame -->
+  <main id="mainContentPanel" class="flex-1 flex flex-col overflow-x-hidden min-h-screen hidden">
+    <!-- Main Content Layout Container -->
+    <div class="flex-1 p-4 md:p-8 space-y-6 max-w-7xl w-full mx-auto">
+      
+      <!-- Interviewer Dashboard View -->
+      <div id="page-interviewer-dashboard" x-show="activeTab === 'interviewer-dashboard'" class="transition-fade" x-cloak>
+        <?!= include('InterviewerDashboard'); ?>
+      </div>
+
+      <!-- Report/Dashboard Analytics View -->
+      <div id="page-dashboard" x-show="activeTab === 'recruitment' && activeSubTab === 'dashboard'" class="transition-fade" x-cloak>
+        <?!= include('Report'); ?>
+      </div>
+
+      <!-- Gmail Scanner View -->
+      <div id="page-scanner" x-show="activeTab === 'recruitment' && activeSubTab === 'scanner'" class="transition-fade" x-cloak>
+        <?!= include('Scanner'); ?>
+      </div>
+
+      <!-- Candidate List View -->
+      <div id="page-candidates" x-show="activeTab === 'recruitment' && (activeSubTab === 'candidates' || activeSubTab === 'list')" class="transition-fade" x-cloak>
+        <?!= include('CandidateList'); ?>
+      </div>
+
+      <!-- System Settings View -->
+      <div id="page-settings" x-show="activeTab === 'settings' && activeSubTab === 'config'" class="transition-fade" x-cloak>
+        <?!= include('Settings'); ?>
+      </div>
+
+      <!-- Forms Manager View -->
+      <div id="page-forms" x-show="activeTab === 'recruitment' && activeSubTab === 'forms'" class="transition-fade" x-cloak>
+        <?!= include('Forms'); ?>
+      </div>
+
+      <!-- Employee Manager View -->
+      <div id="page-employee-manager" x-show="activeTab === 'employee' && activeSubTab === 'profile'" class="transition-fade" x-cloak>
+        <?!= include('EmployeeManager'); ?>
+      </div>
+
+      <!-- Attendance View -->
+      <div id="page-attendance" x-show="activeTab === 'attendance' && activeSubTab === 'logs'" class="transition-fade" x-cloak>
+        <?!= include('Attendance'); ?>
+      </div>
+
+      <!-- Leave Requests View -->
+      <div id="page-leave-module" x-show="activeTab === 'attendance' && activeSubTab === 'leave'" class="transition-fade" x-cloak>
+        <?!= include('LeaveModule'); ?>
+      </div>
+
+      <!-- Payroll Calculator View -->
+      <div id="page-payroll" x-show="activeTab === 'payroll' && activeSubTab === 'calculator'" class="transition-fade" x-cloak>
+        <?!= include('Payroll'); ?>
+      </div>
+
+      <!-- Category Manager View -->
+      <div id="page-category-manager" x-show="activeTab === 'settings' && activeSubTab === 'categories'" class="transition-fade" x-cloak>
+        <?!= include('CategoryManager'); ?>
+      </div>
+
+      <!-- Print Templates View -->
+      <div id="page-print-templates" x-show="activeTab === 'settings' && activeSubTab === 'print-templates'" class="transition-fade" x-cloak>
+        <?!= include('PrintTemplateManager'); ?>
+      </div>
+
+      <!-- User Manager View -->
+      <div id="page-user-manager" x-show="activeTab === 'settings' && activeSubTab === 'users'" class="transition-fade" x-cloak>
+        <?!= include('UserManager'); ?>
+      </div>
+
+      <!-- Employee Detail View -->
+      <div id="page-employee-detail" x-show="activeTab === 'employee' && activeSubTab === 'detail'" class="transition-fade" x-cloak>
+        <?!= include('EmployeeDetail'); ?>
+      </div>
+
+    </div>
+  </main>
+
+  <!-- HR Modals & Form Overlays -->
+  <?!= include('HRModals'); ?>
+  <?!= include('EmployeeForm'); ?>
+
+  <!-- Global JavaScript Core -->
+  <?!= include('CommonJS'); ?>
+
+  <script>
+    // Bootstrapping auth & language
+    window.addEventListener('DOMContentLoaded', () => {
+      checkAuth();
+    });
+
+    /**
+     * Check auth state from localStorage and toggle sections
+     */
+    function checkAuth() {
+      const userStr = localStorage.getItem('recruitment_user');
+      const loginScreen = document.getElementById('loginScreen');
+      const sidebarPanel = document.getElementById('sidebarPanel');
+      const mainContentPanel = document.getElementById('mainContentPanel');
+      
+      if (userStr) {
+        const user = JSON.parse(userStr);
+        
+        // Sync role state with Alpine
+        if (window.Alpine) {
+          const app = document.body && Alpine.$data(document.body);
+          if (app) {
+            app.isLoggedIn = true;
+            app.role = user.role;
+            app.fullName = user.fullName;
+            app.email = user.email || user.username;
+          }
+        }
+        
+        loginScreen.classList.add('hidden');
+        sidebarPanel.classList.remove('hidden');
+        mainContentPanel.classList.remove('hidden');
+        
+        const savedLang = localStorage.getItem('recruitment_lang') || 'vi';
+        setLanguage(savedLang);
+        
+        if (typeof initQuillEditors === 'function') {
+          initQuillEditors();
+        }
+        if (typeof syncThemeSwitcherIcons === 'function') {
+          syncThemeSwitcherIcons();
+        }
+        
+        // Skip calling initSystem on every refresh if we already initialized
+        const isInit = sessionStorage.getItem('isInitialized') === 'true';
+        revealApp(isInit);
+      } else {
+        loginScreen.classList.remove('hidden');
+        sidebarPanel.classList.add('hidden');
+        mainContentPanel.classList.add('hidden');
+        
+        const defaultLang = localStorage.getItem('recruitment_lang') || 'vi';
+        setLanguage(defaultLang);
+      }
+    }
+
+    /**
+     * Submit login inputs to backend using authenticate
+     */
+    function handleLogin() {
+      const user = document.getElementById('login-username').value.trim();
+      const pass = document.getElementById('login-password').value;
+      const btn = document.getElementById('login-btn');
+      const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+
+      if (!user || !pass) {
+        showLoginAlert(currentLang === 'vi' ? 'Vui lòng điền đầy đủ thông tin.' : 'Please fill all fields.', 'warning');
+        return;
+      }
+
+      // Disable button and show spinner
+      btn.disabled = true;
+      btn.innerHTML = `
+        <div class="flex items-center justify-center gap-2">
+          <div class="animate-spin rounded-full h-4 w-4 border-2 border-white border-t-transparent"></div>
+          <span>${currentLang === 'vi' ? 'Đang xác thực...' : 'Authenticating...'}</span>
+        </div>
+      `;
+      hideLoginAlert();
+
+      runBackend('authenticate', user, pass)
+        .then(result => {
+          if (result.success) {
+            // Apply green success transition
+            btn.classList.remove('bg-indigo-600', 'hover:bg-indigo-500');
+            btn.classList.add('bg-emerald-600');
+            btn.innerHTML = `
+              <div class="flex items-center justify-center gap-2">
+                <svg class="w-4 h-4 text-white" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                <span>${currentLang === 'vi' ? 'Đăng nhập thành công!' : 'Logged in successfully!'}</span>
+              </div>
+            `;
+            
+            showLoginAlert(currentLang === 'vi' ? 'Đang kết nối cơ sở dữ liệu...' : 'Connecting to database...', 'success');
+            
+            // Save user to localStorage
+            localStorage.setItem('recruitment_user', JSON.stringify(result.user));
+            
+            // Get system initialization state
+            runBackend('login', user, pass).then(loginRes => {
+              sessionStorage.setItem('isInitialized', loginRes.isInitialized ? 'true' : 'false');
+              
+              // Delayed reveal
+              setTimeout(() => {
+                btn.disabled = false;
+                btn.classList.remove('bg-emerald-600');
+                btn.classList.add('bg-indigo-600');
+                btn.innerHTML = currentLang === 'vi' ? 'Đăng nhập / Log In' : 'Log In';
+                hideLoginAlert();
+                checkAuth();
+              }, 800);
+            }).catch(() => {
+              // Fallback if system initialized status check fails
+              setTimeout(() => {
+                btn.disabled = false;
+                btn.classList.remove('bg-emerald-600');
+                btn.classList.add('bg-indigo-600');
+                btn.innerHTML = currentLang === 'vi' ? 'Đăng nhập / Log In' : 'Log In';
+                hideLoginAlert();
+                checkAuth();
+              }, 800);
+            });
+          } else {
+            btn.disabled = false;
+            btn.innerHTML = currentLang === 'vi' ? 'Đăng nhập / Log In' : 'Log In';
+            showLoginAlert(result.message, 'error');
+          }
+        })
+        .catch(err => {
+          btn.disabled = false;
+          btn.innerHTML = currentLang === 'vi' ? 'Đăng nhập / Log In' : 'Log In';
+          showLoginAlert(currentLang === 'vi' ? 'Lỗi kết nối: ' + err.message : 'Connection error: ' + err.message, 'error');
+        });
+    }
+
+    function showLoginAlert(msg, type) {
+      const alertEl = document.getElementById('login-alert');
+      alertEl.textContent = msg;
+      alertEl.className = 'text-xs py-2.5 px-3 rounded-xl border text-center transition-all duration-300 transform scale-95 opacity-0 block';
+      
+      if (type === 'success') {
+        alertEl.classList.add('bg-emerald-950/60', 'border-emerald-500/40', 'text-emerald-300');
+      } else if (type === 'error') {
+        alertEl.classList.add('bg-rose-950/60', 'border-rose-500/40', 'text-rose-300');
+      } else {
+        alertEl.classList.add('bg-amber-950/60', 'border-amber-500/40', 'text-amber-300');
+      }
+      
+      setTimeout(() => {
+        alertEl.classList.remove('scale-95', 'opacity-0');
+        alertEl.classList.add('scale-100', 'opacity-100');
+      }, 10);
+    }
+
+    function hideLoginAlert() {
+      const alertEl = document.getElementById('login-alert');
+      alertEl.className = 'hidden';
+    }
+
+    /**
+     * Destroy active session and reload
+     */
+    function handleLogout() {
+      if (confirm('Bạn có muốn đăng xuất? / Do you want to log out?')) {
+        localStorage.removeItem('recruitment_user');
+        
+        if (window.Alpine) {
+          const app = document.body && Alpine.$data(document.body);
+          if (app) {
+            app.logout();
+          }
+        }
+        
+        checkAuth();
+      }
+    }
+
+    /**
+     * Authenticated UI entry point
+     */
+    function revealApp(isInitialized) {
+      const savedLang = localStorage.getItem('recruitment_lang') || 'vi';
+      setLanguage(savedLang);
+      
+      // Load configurations globally
+      try {
+        loadSystemConfigs();
+      } catch (e) {
+        console.error("Failed to bootstrap configs:", e);
+      }
+
+      const userStr = localStorage.getItem('recruitment_user');
+      if (!userStr) return;
+      const user = JSON.parse(userStr);
+
+      if (isInitialized) {
+        if (user.role === 'Interviewer') {
+          navigateTo('interviewer-dashboard');
+        } else if (user.role === 'Employee' || user.role === 'Manager') {
+          navigateTo('employee-manager');
+        } else {
+          navigateTo('dashboard');
+        }
+      } else {
+        showLoading(savedLang === 'vi' ? 'Kiểm tra kết nối hệ thống...' : 'Checking connection...');
+        runBackend('initSystem')
+          .then(result => {
+            hideLoading();
+            sessionStorage.setItem('isInitialized', 'true');
+            if (user.role === 'Interviewer') {
+              navigateTo('interviewer-dashboard');
+            } else if (user.role === 'Employee' || user.role === 'Manager') {
+              navigateTo('employee-manager');
+            } else {
+              navigateTo('dashboard');
+            }
+          })
+          .catch(err => {
+            hideLoading();
+            showToast('Lỗi khởi tạo hệ thống: ' + err.message, 'error');
+            navigateTo('settings');
+          });
+      }
+    }
+  </script>
+</body>
+</html>

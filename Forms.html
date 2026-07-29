@@ -1,0 +1,110 @@
+<!-- Forms Management View -->
+<div class="space-y-6 animate-fade-in">
+  <!-- Create Form Card -->
+  <div class="glass-card p-6 md:p-8 rounded-3xl shadow-xl space-y-6 border border-slate-800/80">
+    <div class="flex items-center gap-2">
+      <h3 class="text-xl font-extrabold text-white">Quản lý biểu mẫu khảo sát (Google Forms)</h3>
+      <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Auto Google Forms</span>
+    </div>
+    <p class="text-xs text-slate-400">Tạo và tự động liên kết các biểu mẫu Google Forms gửi tới ứng viên phù hợp để thu thập thông tin</p>
+
+    <!-- Form Input Box -->
+    <div class="flex flex-col sm:flex-row items-end gap-4 text-xs">
+      <div class="flex-1 space-y-2 w-full">
+        <label for="form-name-input" class="block font-bold text-slate-300 uppercase tracking-wider">Tên biểu mẫu khảo sát mới</label>
+        <input type="text" id="form-name-input" placeholder="Ví dụ: Khảo sát thông tin bổ sung ứng viên - Senior Backend Engineer" class="w-full px-4 py-3 rounded-xl glass-input font-bold">
+      </div>
+      <button onclick="createNewForm()" class="w-full sm:w-auto py-3.5 px-6 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/25 active:scale-95 transition-all duration-150 whitespace-nowrap cursor-pointer">
+        Tạo Biểu Mẫu Google Form
+      </button>
+    </div>
+  </div>
+
+  <!-- Forms List Table -->
+  <div class="glass-card p-6 md:p-8 rounded-3xl shadow-xl space-y-4 border border-slate-800/80">
+    <h4 class="text-sm font-bold text-white uppercase tracking-wider">Danh sách biểu mẫu đã liên kết</h4>
+    <div class="overflow-x-auto rounded-2xl border border-slate-800/80">
+      <table class="w-full text-left text-xs glass-table">
+        <thead>
+          <tr>
+            <th class="p-4 font-bold text-slate-300 uppercase">Tên biểu mẫu</th>
+            <th class="p-4 font-bold text-slate-300 uppercase">Trang đáp án Response</th>
+            <th class="p-4 font-bold text-slate-300 uppercase">Ngày tạo</th>
+            <th class="p-4 font-bold text-slate-300 uppercase text-right">Liên kết biểu mẫu</th>
+          </tr>
+        </thead>
+        <tbody id="forms-table-rows" class="divide-y divide-slate-800/50">
+          <!-- Dynamic rows -->
+        </tbody>
+      </table>
+    </div>
+  </div>
+</div>
+
+<script>
+  function loadFormsList() {
+    const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+    const loadMsg = currentLang === 'vi' ? 'Đang tải danh sách biểu mẫu...' : 'Loading forms list...';
+    showLoading(loadMsg);
+
+    runBackend('getAllForms')
+      .then(forms => {
+        hideLoading();
+        const tbody = document.getElementById('forms-table-rows');
+        tbody.innerHTML = '';
+
+        if (forms.length === 0) {
+          const emptyMsg = currentLang === 'vi' ? 'Chưa có biểu mẫu nào được tạo.' : 'No forms have been created yet.';
+          tbody.innerHTML = '<tr><td colspan="4" class="p-8 text-center text-slate-400 italic font-medium">' + emptyMsg + '</td></tr>';
+          return;
+        }
+
+        forms.forEach(f => {
+          const tr = document.createElement('tr');
+          tr.className = "hover:bg-slate-800/30 transition-colors";
+          
+          tr.innerHTML = '<td class="p-4 font-bold text-white text-sm">' + f.name + '</td>' +
+                         '<td class="p-4 font-mono text-xs text-indigo-400">' + f.responseSheetName + '</td>' +
+                         '<td class="p-4 text-slate-400 font-mono text-xs">' + f.createdAt + '</td>' +
+                         '<td class="p-4 text-right space-x-2">' +
+                           '<a href="' + f.publishedUrl + '" target="_blank" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 text-indigo-300 font-bold border border-indigo-500/30 text-xs transition-all">Link gửi ứng viên</a>' +
+                           '<a href="' + f.editUrl + '" target="_blank" class="inline-flex items-center gap-1 px-3 py-1.5 rounded-xl bg-amber-500/15 hover:bg-amber-500/25 text-amber-300 font-bold border border-amber-500/30 text-xs transition-all">Chỉnh sửa Form</a>' +
+                         '</td>';
+          
+          tbody.appendChild(tr);
+        });
+      })
+      .catch(err => {
+        hideLoading();
+        showToast('Failed to load forms: ' + err.message, 'error');
+      });
+  }
+
+  function createNewForm() {
+    const nameInput = document.getElementById('form-name-input');
+    const formName = nameInput.value.trim();
+    const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+
+    if (!formName) {
+      const errName = currentLang === 'vi' ? 'Vui lòng điền tên biểu mẫu cần tạo.' : 'Form name is required.';
+      showToast(errName, 'warning');
+      return;
+    }
+
+    const loadMsg = currentLang === 'vi' ? 'Đang tạo biểu mẫu trên Google Drive...' : 'Creating Google Form...';
+    showLoading(loadMsg);
+
+    runBackend('createAppForm', formName)
+      .then(() => {
+        hideLoading();
+        const successMsg = currentLang === 'vi' ? 'Tạo biểu mẫu thành công!' : 'Google Form created successfully!';
+        showToast(successMsg, 'success');
+        nameInput.value = '';
+        loadFormsList();
+      })
+      .catch(err => {
+        hideLoading();
+        showToast('Creation failed: ' + err.message, 'error');
+      });
+  }
+</script>

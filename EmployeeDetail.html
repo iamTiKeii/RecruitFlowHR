@@ -1,0 +1,733 @@
+<!-- Employee Detail Component -->
+<div id="employee-detail-module" class="space-y-6 animate-fade-in" x-data="employeeDetailState" x-cloak x-show="activeTab === 'employee' && activeSubTab === 'detail'">
+  
+  <!-- Page Header Actions (Quay lại danh sách) -->
+  <div class="flex items-center gap-3 border-b border-slate-800 pb-4">
+    <button @click="backToList" class="p-2.5 hover:bg-slate-800 text-slate-400 hover:text-white rounded-xl transition-all cursor-pointer border border-slate-800">
+      <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M10.5 19.5L3 12m0 0l7.5-7.5M3 12h18"></path></svg>
+    </button>
+    <div>
+      <h2 class="text-xl font-extrabold text-white">Hồ sơ Chi tiết Nhân sự</h2>
+      <p class="text-xs text-slate-400 mt-0.5">Quản lý sơ yếu lý lịch, hợp đồng, quyết định hành chính và phiếu lương cá nhân</p>
+    </div>
+  </div>
+
+  <!-- HEADER CARD: Profile Header Split Layout -->
+  <div class="glass-card rounded-3xl p-6 shadow-xl flex flex-col md:flex-row gap-6 relative border border-slate-800/80">
+    
+    <!-- Left: Avatar 3x4 (Base64) -->
+    <div class="flex flex-col items-center gap-3 w-full md:w-36">
+      <div class="w-32 h-40 border border-slate-800 bg-slate-900/80 rounded-2xl overflow-hidden flex items-center justify-center relative group shadow-md">
+        <template x-if="employee.avatar">
+          <img :src="employee.avatar" class="w-full h-full object-cover">
+        </template>
+        <template x-if="!employee.avatar">
+          <div class="flex flex-col items-center justify-center text-slate-400 p-2 text-center">
+            <svg class="w-8 h-8 mb-1 opacity-40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 6a3.75 3.75 0 11-7.5 0 3.75 3.75 0 017.5 0zM4.501 20.118a7.5 7.5 0 0114.998 0A17.933 17.933 0 0112 21.75c-2.676 0-5.216-.584-7.499-1.632z"></path></svg>
+            <span class="text-[10px] font-bold uppercase tracking-wider">Ảnh 3x4</span>
+          </div>
+        </template>
+        <!-- Hover overlay -->
+        <div class="absolute inset-0 bg-slate-950/60 opacity-0 group-hover:opacity-100 flex items-center justify-center transition-opacity">
+          <label class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-[10px] font-bold cursor-pointer shadow-md transition-all">
+            Đổi ảnh
+            <input type="file" accept="image/*" @change="compressAndUploadAvatar" class="hidden">
+          </label>
+        </div>
+      </div>
+      <p class="text-[10px] text-slate-400 text-center leading-tight font-semibold">Tỉ lệ chuẩn 3x4<br/>Tự động tối ưu</p>
+    </div>
+
+    <!-- Right: Information Grid -->
+    <div class="flex-1 space-y-4">
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <h1 class="text-2xl font-extrabold text-white" x-text="employee.fullName || 'Chưa nhập họ tên'"></h1>
+          <p class="text-xs text-indigo-400 font-bold mt-1" x-text="employee.position || 'Chưa cập nhật chức vụ'"></p>
+        </div>
+        <div>
+          <button @click="saveAllDetails" class="px-6 py-3 bg-indigo-600 hover:bg-indigo-500 text-white text-xs font-bold rounded-xl shadow-lg shadow-indigo-600/25 active:scale-95 transition-all flex items-center gap-2 cursor-pointer">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"></path></svg>
+            <span>Lưu tất cả thay đổi</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Information Grid (Editable Fields) -->
+      <div class="grid grid-cols-2 md:grid-cols-4 gap-4 text-xs border-t border-slate-800 pt-4">
+
+        <!-- Mã nhân sự -->
+        <div>
+          <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Mã nhân sự</span>
+          <span class="inline-flex items-center px-2.5 py-1 bg-indigo-500/20 text-indigo-300 rounded-lg font-mono font-bold text-xs border border-indigo-500/30" x-text="employeeId || 'N/A'"></span>
+        </div>
+
+        <!-- Ngày sinh -->
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Ngày sinh</label>
+          <input type="date" x-model="employee.dateOfBirth" @change="employee.dob = employee.dateOfBirth"
+                 class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono">
+        </div>
+
+        <!-- Email làm việc -->
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Email làm việc</label>
+          <input type="email" x-model="employee.email" placeholder="email@company.com"
+                 class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono">
+        </div>
+
+        <!-- Số điện thoại -->
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Số điện thoại</label>
+          <input type="tel" x-model="employee.phone" placeholder="0xxx xxx xxx"
+                 class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono">
+        </div>
+
+        <!-- Phòng ban -->
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Phòng ban</label>
+          <select x-model="employee.department"
+                  class="w-full px-3 py-2 rounded-xl glass-input bg-slate-900 text-xs font-semibold">
+            <option value="">-- Chọn phòng ban --</option>
+            <template x-for="dept in departmentsList" :key="dept.id">
+              <option :value="dept.name" x-text="dept.name"></option>
+            </template>
+          </select>
+        </div>
+
+        <!-- Chức vụ -->
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Chức vụ</label>
+          <input type="text" x-model="employee.position" placeholder="Chức danh"
+                 class="w-full px-3 py-2 rounded-xl glass-input text-xs font-semibold">
+        </div>
+
+        <!-- Ngày thử việc -->
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Ngày thử việc</label>
+          <input type="date" x-model="employee.probationStartDate"
+                 class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono">
+        </div>
+
+        <!-- Ngày chính thức -->
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Ngày chính thức</label>
+          <input type="date" x-model="employee.officialStartDate"
+                 class="w-full px-3 py-2 rounded-xl glass-input text-xs font-mono">
+        </div>
+
+        <!-- Lương cơ bản -->
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Lương cơ bản (VND)</label>
+          <input type="number" x-model.number="employee.basicSalary" min="0" step="500000"
+                 class="w-full px-3 py-2 rounded-xl glass-input text-xs font-extrabold text-emerald-400">
+        </div>
+
+        <!-- Loại hợp đồng -->
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Loại hợp đồng</label>
+          <select x-model="employee.contractType"
+                  class="w-full px-3 py-2 rounded-xl glass-input bg-slate-900 text-xs font-semibold">
+            <option value="">-- Chọn loại hợp đồng --</option>
+            <template x-for="ct in contractTypesList" :key="ct.id">
+              <option :value="ct.name" x-text="ct.name"></option>
+            </template>
+          </select>
+        </div>
+
+        <!-- Trạng thái -->
+        <div>
+          <label class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Trạng thái</label>
+          <select x-model="employee.status"
+                  class="w-full px-3 py-2 rounded-xl glass-input bg-slate-900 text-xs font-semibold">
+            <option value="Đang làm">Đang làm</option>
+            <option value="Thử việc">Thử việc</option>
+            <option value="Nghỉ thai sản">Nghỉ thai sản</option>
+            <option value="Đã nghỉ việc">Đã nghỉ việc</option>
+          </select>
+        </div>
+
+        <!-- Allowances Badge list -->
+        <div class="col-span-2 md:col-span-4">
+          <span class="block text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-1">Phụ cấp được hưởng</span>
+          <div class="flex flex-wrap gap-1.5 items-center">
+            <template x-for="allow in (employee.allowances || '').split(',')" :key="allow">
+              <template x-if="allow.trim()">
+                <span class="px-2.5 py-1 bg-indigo-500/15 text-indigo-300 rounded-lg font-bold text-[10px] border border-indigo-500/30" x-text="allow.trim()"></span>
+              </template>
+            </template>
+            <template x-if="!(employee.allowances || '').trim()">
+              <span class="text-slate-400 italic text-xs">Không hưởng phụ cấp cố định</span>
+            </template>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- SUB TABS CONTAINER -->
+  <div class="glass-card rounded-3xl overflow-hidden shadow-xl border border-slate-800/80">
+    
+    <!-- Tab Navigation Bar -->
+    <div class="flex items-center bg-slate-900/90 border-b border-slate-800 text-xs font-bold overflow-x-auto">
+      <button @click="currentSubTab = 'work-info'" :class="currentSubTab === 'work-info' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'" class="py-3.5 px-6 transition-all whitespace-nowrap cursor-pointer">Thông tin làm việc & Lý lịch</button>
+      <button @click="currentSubTab = 'decisions'" :class="currentSubTab === 'decisions' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'" class="py-3.5 px-6 transition-all whitespace-nowrap cursor-pointer">Lịch sử quyết định</button>
+      <button @click="currentSubTab = 'payrolls'" :class="currentSubTab === 'payrolls' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'" class="py-3.5 px-6 transition-all whitespace-nowrap cursor-pointer">Danh sách phiếu lương</button>
+      <button @click="currentSubTab = 'candidate-info'" :class="currentSubTab === 'candidate-info' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'" class="py-3.5 px-6 transition-all whitespace-nowrap cursor-pointer">Thông tin ứng viên</button>
+    </div>
+
+    <!-- Tab Panels Container -->
+    <div class="p-6 text-xs space-y-6">
+      
+      <!-- TAB 1: THÔNG TIN LÀM VIỆC & LÝ LỊCH -->
+      <div x-show="currentSubTab === 'work-info'" class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+        
+        <!-- Left Sub-column -->
+        <div class="space-y-6">
+          
+          <!-- Lịch chấm công -->
+          <div class="border border-slate-800 rounded-2xl p-5 bg-slate-900/60 space-y-4">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 class="text-xs font-bold text-white uppercase tracking-wider">Lịch Chấm Công Tháng</h3>
+              <div class="flex items-center gap-2">
+                <button @click="prevMonth" class="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"></path></svg></button>
+                <span class="text-xs font-bold text-indigo-400 font-mono" x-text="currentMonthYearLabel"></span>
+                <button @click="nextMonth" class="p-1 hover:bg-slate-800 rounded text-slate-400 hover:text-white"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"></path></svg></button>
+              </div>
+            </div>
+            
+            <div class="grid grid-cols-7 gap-1 text-center text-[10px] font-bold text-slate-400">
+              <div>T2</div><div>T3</div><div>T4</div><div>T5</div><div>T6</div><div>T7</div><div>CN</div>
+            </div>
+            <div class="grid grid-cols-7 gap-1 text-center text-xs">
+              <template x-for="day in calendarDays">
+                <div :class="day.class" 
+                     :title="day.tooltip" 
+                     class="h-8 w-8 flex items-center justify-center rounded-xl font-bold relative cursor-help">
+                  <span x-text="day.dayNum"></span>
+                </div>
+              </template>
+            </div>
+          </div>
+
+          <!-- Danh sách hợp đồng -->
+          <div class="border border-slate-800 rounded-2xl p-5 space-y-4 bg-slate-900/60">
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider border-b border-slate-800 pb-3">Hợp đồng lao động</h3>
+            <div class="overflow-x-auto rounded-xl border border-slate-800">
+              <table class="w-full text-left text-xs glass-table">
+                <thead>
+                  <tr>
+                    <th class="p-3 font-bold text-slate-300 uppercase">Loại hợp đồng</th>
+                    <th class="p-3 font-bold text-slate-300 uppercase">Ngày hiệu lực</th>
+                    <th class="p-3 font-bold text-slate-300 uppercase">Ngày hết hạn</th>
+                    <th class="p-3 font-bold text-slate-300 uppercase text-center">Trạng thái</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <template x-if="employee.contractType">
+                    <tr class="hover:bg-slate-800/30">
+                      <td class="p-3 font-bold text-indigo-400" x-text="employee.contractType"></td>
+                      <td class="p-3 font-mono text-slate-300" x-text="employee.officialStartDate || employee.probationStartDate || 'Chưa cập nhật'"></td>
+                      <td class="p-3 font-mono text-slate-300" x-text="employee.contractExpiryDate || 'Không thời hạn'"></td>
+                      <td class="p-3 text-center">
+                        <span class="badge-suitable text-[10px] font-bold px-2.5 py-1 rounded-full">Đang hiệu lực</span>
+                      </td>
+                    </tr>
+                  </template>
+                  <template x-if="!employee.contractType">
+                    <tr>
+                      <td colspan="4" class="p-4 text-center text-slate-400 italic">Chưa nhập thông tin loại hợp đồng.</td>
+                    </tr>
+                  </template>
+                </tbody>
+              </table>
+            </div>
+          </div>
+
+          <!-- Hồ sơ & Tài liệu đính kèm -->
+          <div class="border border-slate-800 rounded-2xl p-5 space-y-4 bg-slate-900/60">
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider border-b border-slate-800 pb-3">Tài liệu đính kèm (Google Drive)</h3>
+            
+            <div class="space-y-3">
+              <div class="flex items-center gap-3">
+                <label class="flex items-center gap-2 px-4 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl font-bold cursor-pointer transition-all text-xs shadow-md shadow-indigo-600/20">
+                  <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 16.5V9.75m0 0l3 3m-3-3l-3 3M6.75 19.5a4.5 4.5 0 01-1.41-8.775 5.25 5.25 0 0110.233-2.33 3 3 0 013.758 3.848A3.752 3.752 0 0118 19.5H6.75z"></path></svg>
+                  Tải lên PDF
+                  <input type="file" accept="application/pdf" @change="uploadPDFFile" class="hidden">
+                </label>
+              </div>
+
+              <div class="space-y-2 max-h-40 overflow-y-auto pr-1">
+                <template x-for="(doc, dIdx) in attachedDocs" :key="dIdx">
+                  <div class="flex items-center justify-between bg-slate-900 p-3 rounded-xl border border-slate-800">
+                    <span class="font-semibold text-slate-200 truncate max-w-[200px]" x-text="doc.name"></span>
+                    <div class="flex items-center gap-2">
+                      <a :href="doc.url" target="_blank" class="p-1.5 text-indigo-400 hover:text-white rounded-lg" title="Mở Drive">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"></path></svg>
+                      </a>
+                    </div>
+                  </div>
+                </template>
+                <template x-if="attachedDocs.length === 0">
+                  <p class="text-xs text-slate-400 italic">Chưa tải tài liệu đính kèm nào.</p>
+                </template>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- Right Sub-column -->
+        <div class="space-y-6">
+          
+          <!-- Sơ yếu lý lịch -->
+          <div class="border border-slate-800 rounded-2xl p-5 space-y-4 bg-slate-900/60">
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider border-b border-slate-800 pb-3">Sơ yếu lý lịch cá nhân</h3>
+            
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div>
+                <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Họ và tên</label>
+                <input type="text" x-model="employee.fullName" class="w-full px-3.5 py-2.5 rounded-xl glass-input font-bold">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Giới tính</label>
+                <select x-model="employee.gender" class="w-full px-3.5 py-2.5 rounded-xl glass-input bg-slate-900 font-semibold">
+                  <option value="Nam">Nam</option>
+                  <option value="Nữ">Nữ</option>
+                  <option value="Khác">Khác</option>
+                </select>
+              </div>
+              <div>
+                <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Ngày sinh</label>
+                <input type="date" x-model="employee.dateOfBirth" class="w-full px-3.5 py-2.5 rounded-xl glass-input font-mono">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Nơi sinh</label>
+                <input type="text" x-model="employee.birthPlace" placeholder="Tỉnh / Thành phố" class="w-full px-3.5 py-2.5 rounded-xl glass-input">
+              </div>
+              <div class="md:col-span-2">
+                <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Chỗ ở hiện nay</label>
+                <input type="text" x-model="employee.currentAddress" placeholder="Địa chỉ chi tiết" class="w-full px-3.5 py-2.5 rounded-xl glass-input">
+              </div>
+            </div>
+
+            <!-- CCCD Details -->
+            <div class="grid grid-cols-1 md:grid-cols-3 gap-4 border-t border-slate-800 pt-4">
+              <div>
+                <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Số CCCD / Hộ chiếu</label>
+                <input type="text" x-model="employee.idCardNumber" class="w-full px-3.5 py-2.5 rounded-xl glass-input font-mono">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Ngày cấp</label>
+                <input type="text" x-model="employee.idCardDate" placeholder="dd/mm/yyyy" class="w-full px-3.5 py-2.5 rounded-xl glass-input font-mono">
+              </div>
+              <div>
+                <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Nơi cấp</label>
+                <input type="text" x-model="employee.idCardPlace" class="w-full px-3.5 py-2.5 rounded-xl glass-input">
+              </div>
+            </div>
+          </div>
+
+          <!-- Quan hệ gia đình -->
+          <div class="border border-slate-800 rounded-2xl p-5 space-y-4 bg-slate-900/60">
+            <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+              <h3 class="text-xs font-bold text-white uppercase tracking-wider">Quan hệ gia đình</h3>
+              <button @click="addFamilyRow" class="px-3 py-1.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold transition-all flex items-center gap-1.5 cursor-pointer">
+                + Thêm nhân thân
+              </button>
+            </div>
+            
+            <div class="space-y-3 max-h-80 overflow-y-auto pr-1">
+              <template x-for="(fam, index) in family" :key="index">
+                <div class="bg-slate-900 p-4 rounded-xl border border-slate-800 space-y-2 relative">
+                  <button @click="deleteFamilyRow(index, fam.id)" class="absolute top-3 right-3 text-rose-400 p-1 hover:text-white rounded" title="Xóa">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                  </button>
+                  <div class="grid grid-cols-2 md:grid-cols-3 gap-3">
+                    <div>
+                      <label class="text-[10px] font-bold text-slate-400 block mb-1">Mối quan hệ</label>
+                      <select x-model="fam.relationType" class="w-full p-2 rounded-xl glass-input bg-slate-950">
+                        <option value="Bố/Mẹ">Bố/Mẹ</option>
+                        <option value="Vợ/Chồng">Vợ/Chồng</option>
+                        <option value="Con cái">Con cái</option>
+                        <option value="Anh/Chị/Em">Anh/Chị/Em</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label class="text-[10px] font-bold text-slate-400 block mb-1">Họ và tên</label>
+                      <input type="text" x-model="fam.fullName" placeholder="Họ tên người thân" class="w-full p-2 rounded-xl glass-input">
+                    </div>
+                    <div>
+                      <label class="text-[10px] font-bold text-slate-400 block mb-1">Năm sinh</label>
+                      <input type="number" x-model="fam.birthYear" placeholder="Năm sinh" class="w-full p-2 rounded-xl glass-input font-mono">
+                    </div>
+                  </div>
+                </div>
+              </template>
+            </div>
+          </div>
+
+        </div>
+
+      </div>
+
+      <!-- TAB 2: LỊCH SỬ QUYẾT ĐỊNH -->
+      <div x-show="currentSubTab === 'decisions'" class="space-y-4">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h3 class="text-xs font-bold text-white uppercase tracking-wider">Danh sách quyết định hành chính</h3>
+        </div>
+
+        <div class="overflow-x-auto rounded-2xl border border-slate-800">
+          <table class="w-full text-left text-xs glass-table">
+            <thead>
+              <tr>
+                <th class="p-4 font-bold text-slate-300 uppercase">Số quyết định</th>
+                <th class="p-4 font-bold text-slate-300 uppercase">Loại quyết định</th>
+                <th class="p-4 font-bold text-slate-300 uppercase">Tiêu đề</th>
+                <th class="p-4 font-bold text-slate-300 uppercase">Ký ngày / Có hiệu lực</th>
+                <th class="p-4 font-bold text-slate-300 uppercase">Ghi chú</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/50">
+              <template x-for="dec in decisions" :key="dec.id">
+                <tr class="hover:bg-slate-800/30">
+                  <td class="p-4 font-bold text-indigo-400 font-mono" x-text="dec.decisionNumber"></td>
+                  <td class="p-4">
+                    <span class="px-2.5 py-1 bg-slate-800 text-slate-200 rounded-full font-bold text-[10px]" x-text="dec.decisionType"></span>
+                  </td>
+                  <td class="p-4 font-semibold text-white" x-text="dec.title"></td>
+                  <td class="p-4 font-mono text-slate-300" x-text="`${dec.signDate} / ${dec.effectiveDate}`"></td>
+                  <td class="p-4 text-slate-400" x-text="dec.notes || '-'"></td>
+                </tr>
+              </template>
+              <template x-if="decisions.length === 0">
+                <tr>
+                  <td colspan="5" class="p-6 text-center text-slate-400 italic">Chưa có quyết định hay lịch sử thay đổi vị trí/lương nào.</td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB 3: DANH SÁCH PHIẾU LƯƠNG -->
+      <div x-show="currentSubTab === 'payrolls'" class="space-y-4">
+        <h3 class="text-xs font-bold text-white uppercase tracking-wider border-b border-slate-800 pb-3">Lịch sử phiếu lương cá nhân (Payroll)</h3>
+        
+        <div class="overflow-x-auto rounded-2xl border border-slate-800">
+          <table class="w-full text-left text-xs glass-table">
+            <thead>
+              <tr>
+                <th class="p-4 font-bold text-slate-300 uppercase">Kỳ lương</th>
+                <th class="p-4 font-bold text-slate-300 uppercase text-right">Tổng Gross</th>
+                <th class="p-4 font-bold text-slate-300 uppercase text-right">Thuế TNCN</th>
+                <th class="p-4 font-bold text-slate-300 uppercase text-right">Bảo hiểm (10.5%)</th>
+                <th class="p-4 font-bold text-slate-300 uppercase text-right">Thực lĩnh (Net)</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/50">
+              <template x-for="slip in payslips" :key="slip.id">
+                <tr class="hover:bg-slate-800/30">
+                  <td class="p-4 font-bold text-white font-mono" x-text="`Tháng ${slip.month}/${slip.year}`"></td>
+                  <td class="p-4 text-right font-semibold text-slate-200" x-text="formatCurrency(slip.totalSalary)"></td>
+                  <td class="p-4 text-right text-rose-400 font-mono" x-text="`-${formatCurrency(slip.tax)}`"></td>
+                  <td class="p-4 text-right text-rose-400 font-mono" x-text="`-${formatCurrency(slip.insurance)}`"></td>
+                  <td class="p-4 text-right font-extrabold text-emerald-400 text-sm" x-text="formatCurrency(slip.netSalary)"></td>
+                </tr>
+              </template>
+              <template x-if="payslips.length === 0">
+                <tr>
+                  <td colspan="5" class="p-6 text-center text-slate-400 italic">Chưa có bản ghi phiếu lương nào cho nhân sự này.</td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- TAB 4: THÔNG TIN ỨNG VIÊN -->
+      <div x-show="currentSubTab === 'candidate-info'" class="space-y-6">
+        <div class="border border-slate-800 rounded-2xl p-6 space-y-4 bg-slate-900/60">
+          <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+            <h3 class="text-xs font-bold text-white uppercase tracking-wider">Hồ sơ ứng viên tuyển dụng tương ứng</h3>
+          </div>
+          
+          <template x-if="candidate">
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 text-xs">
+              <div class="space-y-1">
+                <p class="text-slate-400 font-bold">Mã ứng viên:</p>
+                <p class="text-white font-mono font-bold" x-text="candidate.id || '-'"></p>
+              </div>
+              <div class="space-y-1">
+                <p class="text-slate-400 font-bold">Họ tên ứng viên:</p>
+                <p class="text-white font-bold" x-text="candidate.senderName || '-'"></p>
+              </div>
+              <div class="space-y-1">
+                <p class="text-slate-400 font-bold">Email cá nhân:</p>
+                <p class="text-slate-300 font-mono" x-text="candidate.senderEmail || '-'"></p>
+              </div>
+              <div class="space-y-1">
+                <p class="text-slate-400 font-bold">Số điện thoại:</p>
+                <p class="text-slate-300 font-mono" x-text="candidate.phone || '-'"></p>
+              </div>
+            </div>
+          </template>
+          <template x-if="!candidate">
+            <p class="text-xs text-slate-400 italic">Nhân sự này được nhập thủ công, không qua module Tuyển dụng.</p>
+          </template>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+</div>
+
+<script>
+  document.addEventListener('alpine:init', () => {
+    if (!Alpine.store('employeeDetailStateRegistered')) {
+      Alpine.store('employeeDetailStateRegistered', true);
+      
+      Alpine.data('employeeDetailState', () => ({
+        employeeId: '',
+        currentSubTab: 'work-info',
+        employee: {},
+        family: [],
+        education: [],
+        work: [],
+        decisions: [],
+        attendance: [],
+        payslips: [],
+        candidate: null,
+
+        departmentsList: [],
+        contractTypesList: [],
+        qualificationsList: [],
+
+        currentMonth: new Date().getMonth(),
+        currentYear: new Date().getFullYear(),
+        calendarDays: [],
+        currentMonthYearLabel: '',
+
+        init() {
+          this.loadCategoriesLists();
+          window.addEventListener('nav-changed', (e) => {
+            if (e.detail === 'employee-detail') {
+              this.fetchSelectedEmployee();
+            }
+          });
+        },
+
+        loadCategoriesLists() {
+          runBackend('getCategories')
+            .then(data => {
+              this.departmentsList = data.filter(c => c.categoryType === 'Department');
+              this.contractTypesList = data.filter(c => c.categoryType === 'ContractType');
+              this.qualificationsList = data.filter(c => c.categoryType === 'Qualification');
+            })
+            .catch(err => {
+              console.error("Lỗi tải danh mục:", err);
+            });
+        },
+
+        fetchSelectedEmployee() {
+          const storedId = localStorage.getItem('selected_employee_id');
+          if (storedId) {
+            this.employeeId = storedId;
+            this.loadAllData();
+          } else {
+            Swal.fire('Lỗi', 'Không tìm thấy ID nhân sự để xem chi tiết.', 'error');
+            this.backToList();
+          }
+        },
+
+        loadAllData() {
+          showLoading('Đang tải dữ liệu hồ sơ nhân viên...');
+          runBackend('getEmployeeDetail', this.employeeId)
+            .then(res => {
+              if (res.success && res.employee) {
+                this.employee = res.employee;
+                this.family = res.family || [];
+                this.education = res.education || [];
+                this.work = res.work || [];
+                this.decisions = (res.decisions || []).sort((a, b) => String(b.id || "").localeCompare(String(a.id || "")));
+                this.attendance = res.attendance || [];
+                this.payslips = res.payrolls || [];
+                this.candidate = res.candidate || null;
+              } else {
+                Swal.fire('Lỗi', res.message || 'Không thể tải chi tiết hồ sơ', 'error');
+              }
+              this.generateCalendar();
+              hideLoading();
+            })
+            .catch(err => {
+              hideLoading();
+              Swal.fire('Lỗi', 'Không thể tải chi tiết hồ sơ: ' + err.message, 'error');
+            });
+        },
+
+        get attachedDocs() {
+          try {
+            return JSON.parse(this.employee.docs || '[]');
+          } catch(e) {
+            return [];
+          }
+        },
+
+        backToList() {
+          navigateTo('employee-manager');
+        },
+
+        compressAndUploadAvatar(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const img = new Image();
+            img.onload = () => {
+              const targetWidth = 300;
+              const targetHeight = 400;
+              const canvas = document.createElement('canvas');
+              canvas.width = targetWidth;
+              canvas.height = targetHeight;
+              const ctx = canvas.getContext('2d');
+              ctx.drawImage(img, 0, 0, targetWidth, targetHeight);
+              const compressedBase64 = canvas.toDataURL('image/jpeg', 0.8);
+              this.employee.avatar = compressedBase64;
+              Swal.fire('Hoàn tất', 'Đã tải ảnh chân dung và tối ưu dung lượng!', 'success');
+            };
+            img.src = event.target.result;
+          };
+          reader.readAsDataURL(file);
+        },
+
+        uploadPDFFile(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+
+          showLoading('Đang tải tài liệu lên Google Drive...');
+          const reader = new FileReader();
+          reader.onload = (event) => {
+            const base64Data = event.target.result;
+            runBackend('uploadEmployeeDoc', base64Data, file.name, this.employeeId)
+              .then(res => {
+                hideLoading();
+                Swal.fire('Thành công', `Đã tải lên tệp: ${res.fileName}`, 'success');
+                this.loadAllData();
+              })
+              .catch(err => {
+                hideLoading();
+                Swal.fire('Lỗi', 'Không thể tải tài liệu lên: ' + err.message, 'error');
+              });
+          };
+          reader.readAsDataURL(file);
+        },
+
+        addFamilyRow() {
+          this.family.push({ id: '', employeeId: this.employeeId, relationType: 'Bố/Mẹ', fullName: '', birthYear: '', job: '', workPlace: '' });
+        },
+
+        deleteFamilyRow(index, id) {
+          if (id) {
+            Swal.fire({
+              title: 'Xác nhận xóa?',
+              text: 'Dữ liệu sẽ bị xóa khỏi hệ thống.',
+              icon: 'warning',
+              showCancelButton: true,
+              confirmButtonText: 'Đồng ý',
+              cancelButtonText: 'Hủy'
+            }).then(res => {
+              if (res.isConfirmed) {
+                showLoading('Đang xóa...');
+                runBackend('deleteFamilyRelation', id)
+                  .then(() => {
+                    hideLoading();
+                    this.family.splice(index, 1);
+                  })
+                  .catch(err => {
+                    hideLoading();
+                    Swal.fire('Lỗi', err.message, 'error');
+                  });
+              }
+            });
+          } else {
+            this.family.splice(index, 1);
+          }
+        },
+
+        saveAllDetails() {
+          showLoading('Đang lưu thông tin...');
+          this.employee.employeeId = this.employee.employeeId || this.employee.id || this.employeeId;
+          this.employee.id = this.employee.id || this.employee.employeeId;
+          if (this.employee.dob && !this.employee.dateOfBirth) this.employee.dateOfBirth = this.employee.dob;
+
+          runBackend('saveEmployeeDetail', this.employee)
+            .then(() => {
+              const famPromises = this.family.map(f => runBackend('saveFamilyRelation', f));
+              return Promise.all(famPromises);
+            })
+            .then(() => {
+              hideLoading();
+              showToast('Đã lưu thành công toàn bộ hồ sơ!', 'success');
+              this.loadAllData();
+            })
+            .catch(err => {
+              hideLoading();
+              Swal.fire('Lỗi', 'Không thể hoàn tất lưu thông tin: ' + err.message, 'error');
+            });
+        },
+
+        prevMonth() {
+          this.currentMonth--;
+          if (this.currentMonth < 0) {
+            this.currentMonth = 11;
+            this.currentYear--;
+          }
+          this.generateCalendar();
+        },
+
+        nextMonth() {
+          this.currentMonth++;
+          if (this.currentMonth > 11) {
+            this.currentMonth = 0;
+            this.currentYear++;
+          }
+          this.generateCalendar();
+        },
+
+        generateCalendar() {
+          const monthNames = ["Tháng 1", "Tháng 2", "Tháng 3", "Tháng 4", "Tháng 5", "Tháng 6", "Tháng 7", "Tháng 8", "Tháng 9", "Tháng 10", "Tháng 11", "Tháng 12"];
+          this.currentMonthYearLabel = `${monthNames[this.currentMonth]} / ${this.currentYear}`;
+
+          const firstDayIndex = new Date(this.currentYear, this.currentMonth, 1).getDay();
+          const startDayOffset = firstDayIndex === 0 ? 6 : firstDayIndex - 1;
+
+          const daysInMonth = new Date(this.currentYear, this.currentMonth + 1, 0).getDate();
+          const daysArray = [];
+
+          for (let i = 0; i < startDayOffset; i++) {
+            daysArray.push({ dayNum: '', class: 'text-transparent bg-transparent', tooltip: '' });
+          }
+
+          for (let d = 1; d <= daysInMonth; d++) {
+            daysArray.push({
+              dayNum: d,
+              class: 'bg-slate-900 text-slate-400 border border-slate-800 hover:bg-slate-800 h-8 w-8 flex items-center justify-center rounded-xl font-bold relative',
+              tooltip: `Ngày ${d}/${this.currentMonth+1}/${this.currentYear}`
+            });
+          }
+
+          this.calendarDays = daysArray;
+        },
+
+        formatCurrency(val) {
+          if (!val) return '0 VND';
+          return Number(val).toLocaleString('vi-VN') + ' VND';
+        }
+      }));
+    }
+  });
+</script>

@@ -1,0 +1,281 @@
+<!-- Attendance Component -->
+<div id="attendance-module" class="space-y-6 animate-fade-in" x-data="attendanceState">
+  
+  <!-- Page Header -->
+  <div class="glass-card p-6 rounded-3xl flex flex-col md:flex-row md:items-center md:justify-between gap-4 shadow-lg border border-slate-800/80">
+    <div>
+      <div class="flex items-center gap-2">
+        <h2 class="text-xl font-extrabold text-white dark:text-white">Hệ thống Chấm công & Tăng ca (OT)</h2>
+        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">GPS & IP Logger</span>
+      </div>
+      <p class="text-xs text-slate-400 mt-1">Ghi nhận thời gian Check-In / Check-Out thực tế, đồng bộ máy chấm công và quản lý nhật ký làm việc</p>
+    </div>
+  </div>
+
+  <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+    
+    <!-- Left Panel: Check In/Out (For all users) -->
+    <div class="lg:col-span-1 space-y-6">
+      
+      <!-- Personal Check-in Widget -->
+      <div class="glass-card p-6 rounded-3xl shadow-xl border border-slate-800/80 text-center space-y-6">
+        <div class="border-b border-slate-800 pb-3">
+          <h3 class="text-sm font-bold text-white uppercase tracking-wider">Điểm danh Cá nhân</h3>
+        </div>
+        
+        <!-- Live Clock widget -->
+        <div class="space-y-1 py-2 bg-slate-900/80 rounded-2xl border border-slate-800 shadow-inner">
+          <p class="text-3xl font-extrabold text-indigo-400 font-mono tracking-wider" x-text="liveTime"></p>
+          <p class="text-[11px] text-slate-400 font-semibold" x-text="liveDate"></p>
+        </div>
+        
+        <!-- IP display -->
+        <div class="px-3.5 py-2.5 bg-slate-900/90 rounded-xl text-xs text-slate-400 flex items-center justify-between border border-slate-800">
+          <span class="font-medium">Địa chỉ IP thiết bị:</span>
+          <strong class="text-indigo-400 font-mono" x-text="clientIp || 'Đang xác thực...' "></strong>
+        </div>
+
+        <!-- Buttons checkin checkout -->
+        <div class="grid grid-cols-2 gap-4">
+          <button @click="doCheckInOut('checkin')" class="py-3.5 px-4 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded-2xl text-xs font-extrabold shadow-lg shadow-emerald-600/25 transition-all cursor-pointer flex items-center justify-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 4.5l7.5 7.5-7.5 7.5m-6-15l7.5 7.5-7.5 7.5"></path></svg>
+            <span>Check-In</span>
+          </button>
+          <button @click="doCheckInOut('checkout')" class="py-3.5 px-4 bg-rose-600 hover:bg-rose-500 active:scale-95 text-white rounded-2xl text-xs font-extrabold shadow-lg shadow-rose-600/25 transition-all cursor-pointer flex items-center justify-center gap-2">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"></path></svg>
+            <span>Check-Out</span>
+          </button>
+        </div>
+        
+        <!-- Time status indicator -->
+        <p class="text-[11px] text-slate-400">Khung giờ quy định: <span class="font-bold text-white font-mono" x-text="`${configs.attendance_start_time || '08:00'} - ${configs.attendance_end_time || '17:00'}`"></span></p>
+      </div>
+
+      <!-- Import Panel (Admin/HR only) -->
+      <template x-if="role === 'Admin' || role === 'HR'">
+        <div class="glass-card p-6 rounded-3xl shadow-xl border border-slate-800/80 space-y-4">
+          <h3 class="text-sm font-bold text-white border-b border-slate-800 pb-3 flex items-center gap-2">
+            <svg class="w-4 h-4 text-indigo-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5"></path></svg>
+            <span>Đồng bộ từ Máy chấm công</span>
+          </h3>
+          
+          <div class="space-y-3 text-xs">
+            <p class="text-slate-400 text-[11px] leading-relaxed">Tải lên tệp Excel chứa các cột: <strong>emailOrId</strong>, <strong>date</strong> (yyyy-MM-dd), <strong>checkIn</strong> (HH:mm:ss), <strong>checkOut</strong> (HH:mm:ss).</p>
+            <input type="file" @change="handleImportFile" accept=".xlsx, .xls, .csv" class="w-full text-xs text-slate-400 file:mr-4 file:py-2 file:px-4 file:rounded-xl file:border-0 file:text-xs file:font-semibold file:bg-indigo-600 file:text-white cursor-pointer">
+            <button @click="uploadExcelData" :disabled="!excelData.length" class="w-full py-3 bg-indigo-600 hover:bg-indigo-500 disabled:opacity-40 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/25 transition-all cursor-pointer">
+              Đồng bộ dữ liệu (<span x-text="excelData.length"></span> dòng)
+            </button>
+          </div>
+        </div>
+      </template>
+
+    </div>
+
+    <!-- Right Panel: Attendance Logs List -->
+    <div class="lg:col-span-2 space-y-6">
+      
+      <div class="glass-card p-6 rounded-3xl shadow-xl border border-slate-800/80 space-y-5">
+        <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-slate-800 pb-4">
+          <h3 class="text-base font-bold text-white">Nhật ký chấm công theo ngày</h3>
+          
+          <!-- Filters for HR/Manager -->
+          <div x-show="role === 'Admin' || role === 'HR' || role === 'Manager'" class="flex gap-2">
+            <input type="text" x-model="searchQuery" placeholder="Tìm tên/email..." class="px-3 py-2 text-xs rounded-xl glass-input w-44 font-medium">
+            <select x-model="filterDept" class="px-3 py-2 text-xs rounded-xl glass-input bg-slate-900 font-semibold">
+              <option value="All">Tất cả phòng ban</option>
+              <template x-for="dept in departments" :key="dept">
+                <option :value="dept" x-text="dept"></option>
+              </template>
+            </select>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto rounded-2xl border border-slate-800/80">
+          <table class="w-full text-left text-xs glass-table">
+            <thead>
+              <tr>
+                <th class="p-4 font-bold text-slate-300 uppercase">Ngày</th>
+                <th class="p-4 font-bold text-slate-300 uppercase" x-show="role !== 'Employee'">Nhân viên</th>
+                <th class="p-4 font-bold text-slate-300 uppercase">Giờ vào</th>
+                <th class="p-4 font-bold text-slate-300 uppercase">Giờ ra</th>
+                <th class="p-4 font-bold text-slate-300 uppercase">Địa chỉ IP</th>
+                <th class="p-4 font-bold text-slate-300 uppercase text-right">Tăng ca (OT)</th>
+                <th class="p-4 font-bold text-slate-300 uppercase">Trạng thái</th>
+              </tr>
+            </thead>
+            <tbody class="divide-y divide-slate-800/50">
+              <template x-for="log in filteredLogs" :key="log.id">
+                <tr class="hover:bg-slate-800/30 transition-colors">
+                  <td class="p-4 font-extrabold text-white font-mono" x-text="log.date"></td>
+                  <td class="p-4" x-show="role !== 'Employee'">
+                    <p class="font-bold text-white" x-text="log.employeeName"></p>
+                    <p class="text-[10px] text-slate-400 font-mono" x-text="log.employeeEmail"></p>
+                  </td>
+                  <td class="p-4 font-bold text-emerald-400 font-mono" x-text="log.checkIn || '-'"></td>
+                  <td class="p-4 font-bold text-indigo-400 font-mono" x-text="log.checkOut || '-'"></td>
+                  <td class="p-4 text-slate-400 font-mono text-[11px]" x-text="log.ipAddress || '-'"></td>
+                  <td class="p-4 text-right font-extrabold text-amber-400 font-mono" x-text="log.otHours ? `${log.otHours} giờ` : '-'"></td>
+                  <td class="p-4">
+                    <span :class="{
+                      'badge-suitable': log.status === 'Đúng giờ',
+                      'badge-pending': log.status === 'Đi muộn',
+                      'badge-unsuitable': log.status === 'Về sớm'
+                    }" class="px-2.5 py-1 rounded-full text-[10px] font-bold uppercase tracking-wider" x-text="log.status"></span>
+                  </td>
+                </tr>
+              </template>
+              <template x-if="filteredLogs.length === 0">
+                <tr>
+                  <td :colspan="role === 'Employee' ? 6 : 7" class="p-8 text-center text-slate-400 italic">Không có bản ghi công nào khớp.</td>
+                </tr>
+              </template>
+            </tbody>
+          </table>
+        </div>
+      </div>
+      
+    </div>
+
+  </div>
+
+</div>
+
+<!-- XLSX Library for SheetJS parsing Excel Client Side -->
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+
+<script>
+  document.addEventListener('alpine:init', () => {
+    if (!Alpine.store('attendanceStateRegistered')) {
+      Alpine.store('attendanceStateRegistered', true);
+      
+      Alpine.data('attendanceState', () => ({
+        logs: [],
+        configs: {},
+        clientIp: '',
+        liveTime: '',
+        liveDate: '',
+        searchQuery: '',
+        filterDept: 'All',
+        departments: [],
+        excelData: [],
+
+        init() {
+          this.configs = systemConfigs;
+          this.loadAttendanceLogs();
+          this.fetchClientIp();
+          this.startLiveClock();
+          
+          window.addEventListener('nav-changed', (e) => {
+            if (e.detail === 'attendance') {
+              this.configs = systemConfigs;
+              this.loadAttendanceLogs();
+              this.fetchClientIp();
+            }
+          });
+        },
+
+        startLiveClock() {
+          const update = () => {
+            const now = new Date();
+            this.liveTime = now.toLocaleTimeString('vi-VN', { hour12: false });
+            this.liveDate = now.toLocaleDateString('vi-VN', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+          };
+          update();
+          setInterval(update, 1000);
+        },
+
+        fetchClientIp() {
+          fetch('https://api.ipify.org?format=json')
+            .then(res => res.json())
+            .then(data => { this.clientIp = data.ip; })
+            .catch(() => { this.clientIp = '127.0.0.1 (Local)'; });
+        },
+
+        loadAttendanceLogs() {
+          const userStr = localStorage.getItem('recruitment_user');
+          if (!userStr) return;
+          const user = JSON.parse(userStr);
+          
+          showLoading('Đang tải lịch sử chấm công...');
+          runBackend('getAttendanceLogs', user.email || user.username, user.role)
+            .then(data => {
+              this.logs = data;
+              const depts = new Set();
+              data.forEach(l => { if(l.department) depts.add(l.department); });
+              this.departments = Array.from(depts);
+              hideLoading();
+            })
+            .catch(err => {
+              hideLoading();
+              Swal.fire('Lỗi', 'Không thể tải nhật ký chấm công: ' + err.message, 'error');
+            });
+        },
+
+        doCheckInOut(type) {
+          const userStr = localStorage.getItem('recruitment_user');
+          if (!userStr) return;
+          const user = JSON.parse(userStr);
+          const email = user.email || user.username;
+          
+          const label = type === 'checkin' ? 'Check-In' : 'Check-Out';
+          showLoading(`Đang ghi nhận ${label}...`);
+          
+          runBackend('recordAttendance', email, type, this.clientIp)
+            .then(res => {
+              hideLoading();
+              Swal.fire('Thành công', `Đã ghi nhận ${label} thành công lúc ${res.time}!`, 'success');
+              this.loadAttendanceLogs();
+            })
+            .catch(err => {
+              hideLoading();
+              Swal.fire('Thất bại', `Lỗi ${label}: ` + err.message, 'error');
+            });
+        },
+
+        handleImportFile(e) {
+          const file = e.target.files[0];
+          if (!file) return;
+          
+          const reader = new FileReader();
+          reader.onload = (evt) => {
+            const bstr = evt.target.result;
+            const wb = XLSX.read(bstr, { type: 'binary' });
+            const wsname = wb.SheetNames[0];
+            const ws = wb.Sheets[wsname];
+            const data = XLSX.utils.sheet_to_json(ws);
+            this.excelData = data;
+            showToast(`Đã đọc ${data.length} dòng từ tệp Excel.`, 'success');
+          };
+          reader.readAsBinaryString(file);
+        },
+
+        uploadExcelData() {
+          if (!this.excelData.length) return;
+          
+          showLoading('Đang đồng bộ dữ liệu máy chấm công...');
+          runBackend('importAttendanceExcel', this.excelData)
+            .then(res => {
+              hideLoading();
+              Swal.fire('Đồng bộ thành công', `Đã nhập mới/cập nhật ${res.importedCount} dòng công!`, 'success');
+              this.excelData = [];
+              this.loadAttendanceLogs();
+            })
+            .catch(err => {
+              hideLoading();
+              Swal.fire('Lỗi đồng bộ', err.message, 'error');
+            });
+        },
+
+        get filteredLogs() {
+          return this.logs.filter(log => {
+            const matchesSearch = !this.searchQuery || 
+                                  (log.employeeName && log.employeeName.toLowerCase().includes(this.searchQuery.toLowerCase())) ||
+                                  (log.employeeEmail && log.employeeEmail.toLowerCase().includes(this.searchQuery.toLowerCase()));
+            const matchesDept = this.filterDept === 'All' || log.department === this.filterDept;
+            return matchesSearch && matchesDept;
+          });
+        }
+      }));
+    }
+  });
+</script>

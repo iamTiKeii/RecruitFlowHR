@@ -1,0 +1,328 @@
+<!-- Interviewer Dashboard View -->
+<div class="relative min-h-[calc(100vh-10rem)] flex flex-col gap-6 text-left animate-fade-in">
+  <!-- Dashboard Header Banner -->
+  <div class="glass-card p-6 rounded-3xl border border-slate-800/80 shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+    <div>
+      <div class="flex items-center gap-2">
+        <h2 class="text-xl font-extrabold text-white" id="interviewer-welcome-title">Xin chào, Người phỏng vấn</h2>
+        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">Interviewer Portal</span>
+      </div>
+      <p class="text-xs text-slate-400 mt-1">Danh sách ứng viên bạn được phân công phỏng vấn và đánh giá chuyên môn</p>
+    </div>
+    
+    <div class="flex items-center gap-3">
+      <button onclick="loadInterviewerCandidates()" class="flex items-center gap-2 px-4 py-2.5 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 active:scale-95 transition-all shadow-md shadow-indigo-600/25 cursor-pointer">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"></path></svg>
+        <span>Tải lại danh sách</span>
+      </button>
+    </div>
+  </div>
+
+  <!-- Candidates List Table -->
+  <div class="space-y-4">
+    <div class="flex justify-between items-center">
+      <h3 class="text-sm font-bold text-white uppercase tracking-wider">Lịch Phỏng Vấn & Đánh Giá Chi Tiết</h3>
+    </div>
+
+    <div class="glass-card rounded-3xl shadow-xl overflow-hidden border border-slate-800/80">
+      <div class="overflow-x-auto">
+        <table class="w-full text-left text-xs glass-table">
+          <thead>
+            <tr>
+              <th class="p-4 font-bold text-slate-300 uppercase tracking-wider w-8"></th>
+              <th class="p-4 font-bold text-slate-300 uppercase tracking-wider">Ứng viên / Vị trí</th>
+              <th class="p-4 font-bold text-slate-300 uppercase tracking-wider">Lịch phỏng vấn / Meeting Link</th>
+              <th class="p-4 font-bold text-slate-300 uppercase tracking-wider">Trạng thái hiện tại</th>
+              <th class="p-4 font-bold text-slate-300 uppercase tracking-wider text-right">Thao tác đánh giá</th>
+            </tr>
+          </thead>
+          <tbody id="interviewer-table-rows" class="divide-y divide-slate-800/50">
+            <!-- Dynamic rows populated by JS -->
+          </tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Assessment & Offer Setup -->
+  <div id="modal-interviewer-assessment" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-40 hidden flex items-center justify-center p-4">
+    <div class="glass-card max-w-xl w-full p-6 md:p-8 rounded-3xl shadow-2xl space-y-6 border border-slate-800 text-left">
+      <div class="flex items-center justify-between border-b border-slate-800 pb-4">
+        <h3 class="text-base font-extrabold text-white">Đánh giá Chuyên môn & Đề xuất Offer</h3>
+        <button onclick="closeAssessmentModal()" class="text-slate-400 hover:text-white p-1">
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+        </button>
+      </div>
+
+      <div class="space-y-4 text-xs">
+        <input type="hidden" id="assess-cand-id">
+        
+        <!-- Passed / Failed Radio -->
+        <div>
+          <label class="block font-bold text-slate-300 mb-2 uppercase tracking-wider">Kết quả phỏng vấn</label>
+          <div class="flex gap-4">
+            <label class="flex items-center gap-2 cursor-pointer bg-slate-900 border border-slate-800 px-4 py-3 rounded-xl flex-1 hover:border-indigo-500 transition-all">
+              <input type="radio" name="assess-result" value="Passed" onchange="toggleAssessmentPassedFields(true)" checked class="rounded-full border-slate-700 bg-slate-900 text-indigo-600 focus:ring-indigo-600 w-4 h-4">
+              <span class="font-bold text-emerald-400 flex items-center gap-1.5 text-xs">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M5 13l4 4L19 7"></path></svg>
+                Đạt / PASSED
+              </span>
+            </label>
+            <label class="flex items-center gap-2 cursor-pointer bg-slate-900 border border-slate-800 px-4 py-3 rounded-xl flex-1 hover:border-indigo-500 transition-all">
+              <input type="radio" name="assess-result" value="Failed" onchange="toggleAssessmentPassedFields(false)" class="rounded-full border-slate-700 bg-slate-900 text-rose-600 focus:ring-indigo-600 w-4 h-4">
+              <span class="font-bold text-rose-400 flex items-center gap-1.5 text-xs">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+                Không Đạt / FAILED
+              </span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Competency Scorecard Rubric (1-5 Stars) -->
+        <div class="p-4 bg-slate-900/90 border border-slate-800 rounded-2xl space-y-3">
+          <h4 class="font-bold text-indigo-400 uppercase tracking-wider text-xs border-b border-slate-800 pb-2">Bảng điểm Năng lực (Competency Scorecard)</h4>
+          <div class="grid grid-cols-2 gap-3 text-xs">
+            <div>
+              <label class="block text-slate-400 mb-1">Chuyên môn / Kỹ thuật (40%)</label>
+              <select id="assess-score-tech" class="w-full px-3 py-2 rounded-xl glass-input bg-slate-900 text-indigo-300 font-bold">
+                <option value="5">5/5 - Xuất sắc</option>
+                <option value="4" selected>4/5 - Tốt</option>
+                <option value="3">3/5 - Đạt yêu cầu</option>
+                <option value="2">2/5 - Yếu</option>
+                <option value="1">1/5 - Kém</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-slate-400 mb-1">Kỹ năng Giao tiếp (20%)</label>
+              <select id="assess-score-comm" class="w-full px-3 py-2 rounded-xl glass-input bg-slate-900 text-indigo-300 font-bold">
+                <option value="5">5/5 - Xuất sắc</option>
+                <option value="4" selected>4/5 - Tốt</option>
+                <option value="3">3/5 - Đạt yêu cầu</option>
+                <option value="2">2/5 - Yếu</option>
+                <option value="1">1/5 - Kém</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-slate-400 mb-1">Độ phù hợp Văn hóa (20%)</label>
+              <select id="assess-score-culture" class="w-full px-3 py-2 rounded-xl glass-input bg-slate-900 text-indigo-300 font-bold">
+                <option value="5">5/5 - Xuất sắc</option>
+                <option value="4" selected>4/5 - Tốt</option>
+                <option value="3">3/5 - Đạt yêu cầu</option>
+                <option value="2">2/5 - Yếu</option>
+                <option value="1">1/5 - Kém</option>
+              </select>
+            </div>
+            <div>
+              <label class="block text-slate-400 mb-1">Giải quyết Vấn đề (20%)</label>
+              <select id="assess-score-problem" class="w-full px-3 py-2 rounded-xl glass-input bg-slate-900 text-indigo-300 font-bold">
+                <option value="5">5/5 - Xuất sắc</option>
+                <option value="4" selected>4/5 - Tốt</option>
+                <option value="3">3/5 - Đạt yêu cầu</option>
+                <option value="2">2/5 - Yếu</option>
+                <option value="1">1/5 - Kém</option>
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- Optional Offer Fields -->
+        <div id="assess-passed-fields" class="space-y-4 border-t border-slate-800 pt-4">
+          <div>
+            <label for="assess-salary" class="block font-bold text-slate-300 uppercase tracking-wider mb-1.5">Đề xuất Lương Gross (VND/Tháng)</label>
+            <input type="text" id="assess-salary" placeholder="Ví dụ: 20,000,000" oninput="formatCurrencyInput(this)" class="w-full px-4 py-3 rounded-xl glass-input font-bold text-indigo-300">
+          </div>
+          <div>
+            <label for="assess-start-date" class="block font-bold text-slate-300 uppercase tracking-wider mb-1.5">Ngày dự kiến bắt đầu</label>
+            <input type="date" id="assess-start-date" class="w-full px-4 py-3 rounded-xl glass-input font-mono">
+          </div>
+        </div>
+
+        <div>
+          <label for="assess-notes" class="block font-bold text-slate-300 uppercase tracking-wider mb-1.5">Nhận xét chi tiết (Lý do Đạt / Không Đạt)</label>
+          <textarea id="assess-notes" rows="3" placeholder="Nhập nhận xét chuyên môn, kỹ năng, thái độ, lý do đề xuất..." class="w-full px-4 py-3 rounded-xl glass-input"></textarea>
+        </div>
+      </div>
+
+      <div class="flex items-center justify-end gap-3 border-t border-slate-800 pt-4 text-xs">
+        <button onclick="closeAssessmentModal()" class="py-2.5 px-5 rounded-xl font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer">Hủy bỏ</button>
+        <button onclick="submitAssessment()" class="py-2.5 px-6 rounded-xl font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/25 active:scale-95 transition-all cursor-pointer">Lưu Đánh Giá</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+  function loadInterviewerCandidates() {
+    const userStr = localStorage.getItem('recruitment_user');
+    if (!userStr) return;
+    const user = JSON.parse(userStr);
+    
+    const titleEl = document.getElementById('interviewer-welcome-title');
+    if (titleEl) {
+      titleEl.textContent = 'Xin chào, ' + (user.fullName || 'Người phỏng vấn');
+    }
+    
+    showLoading('Đang tải lịch phỏng vấn...');
+    
+    runBackend('getInterviewerCandidates', user.email)
+      .then(candidates => {
+        hideLoading();
+        renderInterviewerTable(candidates);
+      })
+      .catch(err => {
+        hideLoading();
+        showToast('Lỗi tải ứng viên: ' + err.message, 'error');
+      });
+  }
+
+  function renderInterviewerTable(candidates) {
+    const tbody = document.getElementById('interviewer-table-rows');
+    tbody.innerHTML = '';
+    
+    if (!candidates || candidates.length === 0) {
+      tbody.innerHTML = '<tr><td colspan="5" class="p-8 text-center text-slate-400 italic font-medium">Bạn chưa được gán lịch phỏng vấn nào.</td></tr>';
+      return;
+    }
+    
+    candidates.forEach(cand => {
+      let statusBadge = '';
+      if (cand.status === 'Pending') {
+        statusBadge = '<span class="badge-pending text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full">Chờ phỏng vấn</span>';
+      } else if (cand.status === 'Interviewed') {
+        statusBadge = '<span class="bg-indigo-950/40 text-indigo-300 border border-indigo-500/30 text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full">Đã phỏng vấn</span>';
+      } else {
+        statusBadge = '<span class="badge-cancelled text-[10px] font-bold uppercase tracking-wider px-2.5 py-1 rounded-full">' + cand.status + '</span>';
+      }
+      
+      const isDriveLink = cand.cvLink && cand.cvLink.startsWith('http');
+      const cvBtn = isDriveLink 
+        ? `<button onclick="previewCvSaved('${cand.id}')" class="p-2.5 rounded-xl bg-slate-900 border border-slate-700/60 hover:bg-slate-800 text-indigo-400 hover:text-white transition-all flex items-center gap-1.5 cursor-pointer font-bold text-xs" title="Xem hồ sơ & CV"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path><path stroke-linecap="round" stroke-linejoin="round" d="M2.036 12.322a1.012 1.012 0 010-.639C3.423 7.51 7.36 4.5 12 4.5c4.638 0 8.573 3.007 9.963 7.178.07.207.07.43 0 .639C20.577 16.49 16.64 19.5 12 19.5c-4.638 0-8.573-3.007-9.963-7.178z"></path></svg> CV & Email</button>`
+        : `<span class="text-slate-500 italic text-[11px]">Không có</span>`;
+        
+      const assessBtn = `<button onclick="openAssessmentModal('${cand.id}')" class="p-2.5 rounded-xl bg-indigo-600 hover:bg-indigo-500 text-white transition-all flex items-center gap-1.5 font-bold cursor-pointer shadow-md shadow-indigo-600/20" title="Đánh giá"><svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg> Đánh giá</button>`;
+      
+      const meetLinkHTML = cand.meetLink 
+        ? `<a href="${cand.meetLink}" target="_blank" class="inline-flex items-center gap-1 text-emerald-400 hover:text-emerald-300 font-bold underline font-mono text-xs"><svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"></path></svg> Tham gia Google Meet</a>`
+        : `<span class="text-slate-500 italic text-[11px]">Chưa tạo Google Meet</span>`;
+        
+      const row = document.createElement('tr');
+      row.className = "hover:bg-slate-800/30 transition-colors";
+      row.innerHTML = `
+        <td class="p-4 text-center"><span class="w-3 h-3 rounded-full bg-blue-500 block shadow-sm shadow-blue-500/50 mx-auto"></span></td>
+        <td class="p-4">
+          <div class="font-bold text-white text-sm">${cand.senderName}</div>
+          <div class="text-slate-400 mt-0.5 text-xs font-mono">${cand.senderEmail}</div>
+          <div class="text-indigo-400 font-semibold mt-1">${cand.subject}</div>
+        </td>
+        <td class="p-4">
+          <div class="text-slate-200 font-bold font-mono">${cand.interviewInfo || 'N/A'}</div>
+          <div class="mt-1">${meetLinkHTML}</div>
+        </td>
+        <td class="p-4 status-cell">${statusBadge}</td>
+        <td class="p-4 text-right">
+          <div class="flex items-center justify-end gap-2">
+            ${cvBtn}
+            ${assessBtn}
+          </div>
+        </td>
+      `;
+      tbody.appendChild(row);
+    });
+  }
+
+  function openAssessmentModal(candidateId) {
+    document.getElementById('assess-cand-id').value = candidateId;
+    document.getElementById('assess-salary').value = '';
+    document.getElementById('assess-start-date').value = '';
+    document.getElementById('assess-notes').value = '';
+    
+    const radios = document.getElementsByName('assess-result');
+    for (let r of radios) {
+      if (r.value === 'Passed') r.checked = true;
+    }
+    toggleAssessmentPassedFields(true);
+    
+    document.getElementById('modal-interviewer-assessment').classList.remove('hidden');
+  }
+
+  function closeAssessmentModal() {
+    document.getElementById('modal-interviewer-assessment').classList.add('hidden');
+  }
+
+  function toggleAssessmentPassedFields(isPassed) {
+    const fieldsDiv = document.getElementById('assess-passed-fields');
+    if (isPassed) {
+      fieldsDiv.classList.remove('hidden');
+    } else {
+      fieldsDiv.classList.add('hidden');
+    }
+  }
+
+  function submitAssessment() {
+    const id = document.getElementById('assess-cand-id').value;
+    const notes = document.getElementById('assess-notes').value.trim();
+    
+    const radios = document.getElementsByName('assess-result');
+    let result = 'Passed';
+    for (let r of radios) {
+      if (r.checked) {
+        result = r.value;
+        break;
+      }
+    }
+    
+    const userStr = localStorage.getItem('recruitment_user');
+    if (!userStr) return;
+    const user = JSON.parse(userStr);
+    
+    let offerData = null;
+    if (result === 'Passed') {
+      const gross = document.getElementById('assess-salary').value.trim();
+      const startDate = document.getElementById('assess-start-date').value;
+      
+      if (!gross || !startDate || !notes) {
+        showToast('Vui lòng nhập đề xuất lương, ngày bắt đầu và nhận xét lý do đạt.', 'warning');
+        return;
+      }
+      offerData = {
+        gross: gross,
+        startDate: startDate,
+        notes: notes
+      };
+    } else {
+      if (!notes) {
+        showToast('Vui lòng nhập lý do đánh giá không đạt.', 'warning');
+        return;
+      }
+    }
+    
+    const tech = Number(document.getElementById('assess-score-tech').value) || 4;
+    const comm = Number(document.getElementById('assess-score-comm').value) || 4;
+    const culture = Number(document.getElementById('assess-score-culture').value) || 4;
+    const problem = Number(document.getElementById('assess-score-problem').value) || 4;
+    const weightedAvg = Number((tech * 0.4 + comm * 0.2 + culture * 0.2 + problem * 0.2).toFixed(2));
+
+    const scorecardData = {
+      tech: tech,
+      comm: comm,
+      culture: culture,
+      problem: problem,
+      weightedAvg: weightedAvg,
+      notes: notes
+    };
+    
+    closeAssessmentModal();
+    showLoading('Đang lưu kết quả đánh giá phỏng vấn...');
+    
+    runBackend('updateInterviewResult', id, result, offerData, user.email, scorecardData)
+      .then(() => {
+        hideLoading();
+        showToast('Đã ghi nhận kết quả đánh giá thành công! (HR sẽ duyệt và gửi email sau)', 'success');
+        loadInterviewerCandidates();
+      })
+      .catch(err => {
+        hideLoading();
+        showToast('Lỗi ghi nhận đánh giá: ' + err.message, 'error');
+      });
+  }
+</script>

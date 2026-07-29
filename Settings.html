@@ -1,0 +1,425 @@
+<!-- System Settings View -->
+<div class="space-y-6 animate-fade-in">
+  <!-- Sub-Tabs Navigation for Settings -->
+  <div class="flex items-center gap-1.5 p-1 bg-slate-900/90 rounded-2xl border border-slate-800 max-w-max text-[11px] font-bold shadow-md overflow-x-auto">
+    <button id="set-tab-general" onclick="switchSettingsTab('general')" class="px-4 py-2 rounded-xl transition-all duration-150 bg-indigo-600 text-white shadow-md shadow-indigo-600/25 cursor-pointer">
+      Cấu hình chung / General
+    </button>
+    <button id="set-tab-company" onclick="switchSettingsTab('company')" class="px-4 py-2 rounded-xl transition-all duration-150 text-slate-400 hover:text-slate-200 cursor-pointer">
+      Thông tin công ty / Company
+    </button>
+    <button id="set-tab-emails" onclick="switchSettingsTab('emails')" class="px-4 py-2 rounded-xl transition-all duration-150 text-slate-400 hover:text-slate-200 cursor-pointer">
+      Mẫu Email / Email Templates
+    </button>
+    <button id="set-tab-prints" onclick="switchSettingsTab('prints')" class="px-4 py-2 rounded-xl transition-all duration-150 text-slate-400 hover:text-slate-200 cursor-pointer">
+      Mẫu In ấn / Print Docs
+    </button>
+    <button id="set-tab-security" onclick="switchSettingsTab('security')" class="px-4 py-2 rounded-xl transition-all duration-150 text-slate-400 hover:text-slate-200 cursor-pointer">
+      Bảo mật / Security
+    </button>
+  </div>
+
+  <!-- Main System Settings Form Container -->
+  <div class="glass-card p-6 md:p-8 rounded-3xl shadow-xl space-y-6 border border-slate-800/80">
+    <div class="flex flex-col sm:flex-row sm:items-center justify-between border-b border-slate-800 pb-4 gap-4">
+      <div>
+        <h3 class="text-xl font-extrabold text-white" data-i18n="settings-title">Thiết lập Cấu hình Hệ thống</h3>
+        <p class="text-xs text-slate-400 mt-1" data-i18n="settings-subtitle">Cài đặt thư mục Google Drive, quy tắc lọc mail tuyển dụng và nội dung mẫu thư tự động</p>
+      </div>
+      
+      <!-- System links -->
+      <div id="settings-general-links" class="flex items-center gap-3">
+        <a id="link-sheet" href="#" target="_blank" class="hidden inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-emerald-500/15 hover:bg-emerald-500/25 border border-emerald-500/30 text-emerald-300 text-xs font-bold transition-all" data-i18n="settings-btn-sheet">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M13.5 6H5.25A2.25 2.25 0 003 8.25v10.5A2.25 2.25 0 005.25 21h10.5A2.25 2.25 0 0018 18.75V10.5m-10.5 6L21 3m0 0h-5.25M21 3v5.25"></path></svg>
+          Mở Google Sheet
+        </a>
+        <a id="link-folder" href="#" target="_blank" class="hidden inline-flex items-center gap-2 px-3.5 py-2 rounded-xl bg-indigo-500/15 hover:bg-indigo-500/25 border border-indigo-500/30 text-indigo-300 text-xs font-bold transition-all" data-i18n="settings-btn-folder">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 014.5 9.75h15A2.25 2.25 0 0121.75 12v.75m-8.69-6.44l-2.12-2.12a1.5 1.5 0 00-1.061-.44H4.5A2.25 2.25 0 002.25 6v12a2.25 2.25 0 002.25 2.25h15A2.25 2.25 0 0021.75 18V9a2.25 2.25 0 00-2.25-2.25h-5.379a1.5 1.5 0 01-1.06-.44z"></path></svg>
+          Mở Thư mục Drive
+        </a>
+      </div>
+    </div>
+
+    <!-- Configuration Form Groups -->
+    <div class="space-y-6">
+      <!-- 1. General Tab -->
+      <div id="settings-group-general" class="space-y-6">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label for="config-folder-id" class="block font-bold text-slate-300 uppercase tracking-wider" data-i18n="settings-lbl-folder">Google Drive Folder ID (Thư mục CV)</label>
+              <button onclick="openDriveGuide()" class="text-[11px] font-bold text-indigo-400 hover:text-indigo-300 underline cursor-pointer" data-i18n="guide-btn">Hướng dẫn lấy Drive ID</button>
+            </div>
+            <input type="text" id="config-folder-id" placeholder="Folder alphanumeric ID từ URL Google Drive..." class="w-full px-4 py-3 rounded-xl glass-input font-mono">
+          </div>
+          <div>
+            <label for="config-target-email" class="block font-bold text-slate-300 uppercase tracking-wider mb-2" data-i18n="settings-lbl-target-email">Email nhận thư tuyển dụng (Lọc theo email nhận)</label>
+            <input type="email" id="config-target-email" placeholder="Ví dụ: tuyendung@company.com" class="w-full px-4 py-3 rounded-xl glass-input font-mono">
+          </div>
+        </div>
+      </div>
+
+      <!-- 2. Company Profile Tab -->
+      <div id="settings-group-company" class="space-y-6 hidden">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+          <div>
+            <label for="config-company-name" class="block font-bold text-slate-300 uppercase tracking-wider mb-2">Tên công ty / Doanh nghiệp</label>
+            <input type="text" id="config-company-name" placeholder="Ví dụ: Công ty Cổ phần Công nghệ RecruitFlow" class="w-full px-4 py-3 rounded-xl glass-input">
+          </div>
+          <div>
+            <label for="config-company-phone" class="block font-bold text-slate-300 uppercase tracking-wider mb-2">Số điện thoại liên hệ HR</label>
+            <input type="text" id="config-company-phone" placeholder="Ví dụ: 028 1234 5678" class="w-full px-4 py-3 rounded-xl glass-input font-mono">
+          </div>
+          <div class="md:col-span-2">
+            <label for="config-company-address" class="block font-bold text-slate-300 uppercase tracking-wider mb-2">Địa chỉ trụ sở công ty</label>
+            <input type="text" id="config-company-address" placeholder="Ví dụ: Tầng 12, Tòa nhà Văn phòng, Q.1, TP. Hồ Chí Minh" class="w-full px-4 py-3 rounded-xl glass-input">
+          </div>
+        </div>
+      </div>
+
+      <!-- 3. Email Templates Tab -->
+      <div id="settings-group-emails" class="space-y-6 hidden">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+          <div class="space-y-2">
+            <label for="config-template-interview" class="block font-bold text-slate-300 uppercase tracking-wider" data-i18n="settings-lbl-temp-int">Mẫu Email Thư mời Phỏng vấn</label>
+            <p class="text-[10px] text-slate-400 mb-1.5">Các thẻ thay thế: <code class="text-indigo-400 font-mono">{{name}}</code>, <code class="text-indigo-400 font-mono">{{interview_date}}</code>, <code class="text-indigo-400 font-mono">{{location}}</code>, <code class="text-indigo-400 font-mono">{{company_name}}</code></p>
+            <div id="config-template-interview" class="w-full rounded-2xl glass-input overflow-hidden" style="min-height: 200px;"></div>
+          </div>
+          <div class="space-y-2">
+            <label for="config-template-rejection" class="block font-bold text-slate-400 uppercase tracking-wider" data-i18n="settings-lbl-temp-rej">Mẫu Email Thư từ chối Hồ sơ</label>
+            <p class="text-[10px] text-slate-400 mb-1.5">Các thẻ thay thế: <code class="text-indigo-400 font-mono">{{name}}</code>, <code class="text-indigo-400 font-mono">{{rejection_reason}}</code>, <code class="text-indigo-400 font-mono">{{company_name}}</code></p>
+            <div id="config-template-rejection" class="w-full rounded-2xl glass-input overflow-hidden" style="min-height: 200px;"></div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 4. Print Templates Tab -->
+      <div id="settings-group-prints" class="space-y-6 hidden">
+        <div class="grid grid-cols-1 md:grid-cols-2 gap-6 text-xs">
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label for="config-template-offer-id" class="block font-bold text-slate-300 uppercase tracking-wider">Google Doc Template ID (Offer Letter PDF)</label>
+              <a id="link-template-offer-doc" href="#" target="_blank" class="hidden text-[11px] font-bold text-indigo-400 hover:text-indigo-300 underline">Mở File Doc</a>
+            </div>
+            <input type="text" id="config-template-offer-id" placeholder="ID tệp Google Doc từ đường dẫn URL..." class="w-full px-4 py-3 rounded-xl glass-input font-mono" oninput="updateTemplateLinks()">
+          </div>
+          <div>
+            <div class="flex items-center justify-between mb-2">
+              <label for="config-template-app-id" class="block font-bold text-slate-300 uppercase tracking-wider">Google Doc Template ID (Phiếu Ứng viên PDF)</label>
+              <a id="link-template-app-doc" href="#" target="_blank" class="hidden text-[11px] font-bold text-indigo-400 hover:text-indigo-300 underline">Mở File Doc</a>
+            </div>
+            <input type="text" id="config-template-app-id" placeholder="ID tệp Google Doc từ đường dẫn URL..." class="w-full px-4 py-3 rounded-xl glass-input font-mono" oninput="updateTemplateLinks()">
+          </div>
+        </div>
+      </div>
+
+      <!-- 5. Security Tab -->
+      <div id="settings-group-security" class="space-y-6 hidden">
+        <div class="p-6 bg-slate-900/80 rounded-2xl border border-slate-800 space-y-4">
+          <h4 class="text-xs font-bold text-white uppercase tracking-wider">Đổi mật khẩu tài khoản Quản trị viên (Admin)</h4>
+          <div class="grid grid-cols-1 sm:grid-cols-3 gap-6 text-xs">
+            <div>
+              <label for="pw-old" class="block font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Mật khẩu cũ</label>
+              <input type="password" id="pw-old" class="w-full px-4 py-3 rounded-xl glass-input" placeholder="••••••••">
+            </div>
+            <div>
+              <label for="pw-new" class="block font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Mật khẩu mới</label>
+              <input type="password" id="pw-new" class="w-full px-4 py-3 rounded-xl glass-input" placeholder="••••••••">
+            </div>
+            <div>
+              <label for="pw-confirm" class="block font-bold text-slate-400 mb-1.5 uppercase tracking-wider">Xác nhận mật khẩu</label>
+              <input type="password" id="pw-confirm" class="w-full px-4 py-3 rounded-xl glass-input" placeholder="••••••••">
+            </div>
+          </div>
+          <div class="flex justify-end pt-4 border-t border-slate-800">
+            <button onclick="handlePasswordChange()" class="py-3 px-6 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-md transition-all cursor-pointer">
+              Cập nhật mật khẩu ngay
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Global Save Action Bar -->
+    <div id="settings-global-actions" class="flex items-center justify-between border-t border-slate-800 pt-6">
+      <button onclick="reinitializeDatabase()" class="py-3 px-5 rounded-xl text-xs font-bold text-rose-400 bg-rose-950/30 hover:bg-rose-950/60 border border-rose-900/40 transition-colors cursor-pointer" data-i18n="settings-btn-reset">
+        Thiết lập lại Database
+      </button>
+      <button onclick="saveConfiguration()" class="py-3.5 px-7 rounded-xl text-xs font-bold text-white bg-indigo-600 hover:bg-indigo-500 shadow-lg shadow-indigo-600/25 active:scale-95 transition-all duration-150 cursor-pointer" data-i18n="settings-btn-save">
+        Lưu cài đặt cấu hình
+      </button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Drive Folder ID Guide -->
+<div id="modal-drive-guide" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 hidden flex items-center justify-center p-4">
+  <div class="glass-card max-w-lg w-full p-6 md:p-8 rounded-3xl shadow-2xl space-y-6 border border-slate-800">
+    <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+      <h3 class="text-base font-bold text-white" data-i18n="guide-title">Hướng dẫn lấy Google Drive Folder ID</h3>
+      <button onclick="closeDriveGuide()" class="text-slate-400 hover:text-white p-1">
+        <svg class="w-5 h-5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
+      </button>
+    </div>
+    
+    <div class="space-y-3.5 text-xs text-slate-300 leading-relaxed">
+      <p data-i18n="guide-p1">1. Mở trình duyệt và truy cập vào tài khoản Google Drive của bạn.</p>
+      <p data-i18n="guide-p2">2. Tạo một thư mục mới (ví dụ: 'Recruitment CVs') hoặc mở thư mục sẵn có.</p>
+      <p data-i18n="guide-p3">3. Nhìn lên thanh địa chỉ của trình duyệt, đường dẫn thư mục sẽ có dạng:</p>
+      <div class="bg-slate-900 p-3.5 rounded-xl border border-slate-800 font-mono text-[11px] text-indigo-400 break-all select-all">
+        https://drive.google.com/drive/folders/<span class="bg-indigo-500/20 text-indigo-200 px-1.5 py-0.5 rounded font-bold border border-indigo-500/40">1aBcDeFgHiJkLmNoPqRsTuVwXyZ123456</span>
+      </div>
+      <p><span data-i18n="guide-p4">4. Sao chép toàn bộ chuỗi ký tự nằm sau chữ</span> <code class="text-indigo-400 bg-slate-900 px-1.5 py-0.5 rounded font-mono">folders/</code>.</p>
+      <p data-i18n="guide-p6">5. Dán ID vào ô 'Google Drive Folder ID' và nhấn nút Lưu cài đặt cấu hình.</p>
+    </div>
+    
+    <div class="flex justify-end pt-2">
+      <button onclick="closeDriveGuide()" class="py-2.5 px-5 rounded-xl text-xs font-bold text-slate-300 bg-slate-800 hover:bg-slate-700 transition-colors cursor-pointer" data-i18n="guide-close">
+        Đóng hướng dẫn
+      </button>
+    </div>
+  </div>
+</div>
+
+<script>
+  function switchSettingsTab(tabName) {
+    const tabs = ['general', 'company', 'emails', 'prints', 'security'];
+    tabs.forEach(t => {
+      const btn = document.getElementById('set-tab-' + t);
+      const group = document.getElementById('settings-group-' + t);
+      if (btn) {
+        if (t === tabName) {
+          btn.classList.add('bg-indigo-600', 'text-white', 'shadow-md');
+          btn.classList.remove('text-slate-400', 'hover:text-slate-200');
+        } else {
+          btn.classList.remove('bg-indigo-600', 'text-white', 'shadow-md');
+          btn.classList.add('text-slate-400', 'hover:text-slate-200');
+        }
+      }
+      if (group) {
+        if (t === tabName) {
+          group.classList.remove('hidden');
+        } else {
+          group.classList.add('hidden');
+        }
+      }
+    });
+
+    const actionsPanel = document.getElementById('settings-global-actions');
+    if (actionsPanel) {
+      if (tabName === 'security') {
+        actionsPanel.classList.add('hidden');
+      } else {
+        actionsPanel.classList.remove('hidden');
+      }
+    }
+  }
+
+  function updateTemplateLinks() {
+    const offerDocId = document.getElementById('config-template-offer-id').value.trim();
+    const appDocId = document.getElementById('config-template-app-id').value.trim();
+    
+    const linkOfferDoc = document.getElementById('link-template-offer-doc');
+    const linkAppDoc = document.getElementById('link-template-app-doc');
+
+    if (offerDocId) {
+      linkOfferDoc.href = 'https://docs.google.com/document/d/' + offerDocId + '/edit';
+      linkOfferDoc.classList.remove('hidden');
+    } else {
+      linkOfferDoc.classList.add('hidden');
+    }
+
+    if (appDocId) {
+      linkAppDoc.href = 'https://docs.google.com/document/d/' + appDocId + '/edit';
+      linkAppDoc.classList.remove('hidden');
+    } else {
+      linkAppDoc.classList.add('hidden');
+    }
+  }
+
+  function loadSettingsForm() {
+    const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+    const loadMsg = currentLang === 'vi' ? 'Đang tải cài đặt...' : 'Fetching settings...';
+    showLoading(loadMsg);
+    
+    runBackend('getConfig')
+      .then(config => {
+        window.systemConfigs = config;
+        document.getElementById('config-folder-id').value = config.cv_folder_id || '';
+        document.getElementById('config-target-email').value = config.target_email_to_scan || '';
+        
+        if (typeof quillInterview !== 'undefined' && quillInterview) {
+          quillInterview.root.innerHTML = config.template_interview || '';
+        } else {
+          document.getElementById('config-template-interview').innerHTML = config.template_interview || '';
+        }
+        
+        if (typeof quillRejection !== 'undefined' && quillRejection) {
+          quillRejection.root.innerHTML = config.template_rejection || '';
+        } else {
+          document.getElementById('config-template-rejection').innerHTML = config.template_rejection || '';
+        }
+        
+        document.getElementById('config-company-name').value = config.company_name || '';
+        document.getElementById('config-company-phone').value = config.company_phone || '';
+        document.getElementById('config-company-address').value = config.company_address || '';
+
+        document.getElementById('config-template-offer-id').value = config.template_offer_doc_id || '';
+        document.getElementById('config-template-app-id').value = config.template_app_doc_id || '';
+        updateTemplateLinks();
+        
+        return runBackend('getSystemMeta');
+      })
+      .then(meta => {
+        hideLoading();
+        
+        const linkSheet = document.getElementById('link-sheet');
+        const linkFolder = document.getElementById('link-folder');
+        
+        if (meta.spreadsheetUrl) {
+          linkSheet.href = meta.spreadsheetUrl;
+          linkSheet.classList.remove('hidden');
+        }
+        if (meta.cvFolderUrl) {
+          linkFolder.href = meta.cvFolderUrl;
+          linkFolder.classList.remove('hidden');
+        }
+      })
+      .catch(err => {
+        hideLoading();
+        showToast('Failed to load settings: ' + err.message, 'error');
+      });
+  }
+
+  function saveConfiguration() {
+    const folderId = document.getElementById('config-folder-id').value.trim();
+    const targetEmail = document.getElementById('config-target-email').value.trim();
+    
+    const templateInterview = (typeof quillInterview !== 'undefined' && quillInterview) ? quillInterview.root.innerHTML : document.getElementById('config-template-interview').innerHTML.trim();
+    const templateRejection = (typeof quillRejection !== 'undefined' && quillRejection) ? quillRejection.root.innerHTML : document.getElementById('config-template-rejection').innerHTML.trim();
+    
+    const compName = document.getElementById('config-company-name').value.trim();
+    const compPhone = document.getElementById('config-company-phone').value.trim();
+    const compAddr = document.getElementById('config-company-address').value.trim();
+
+    const offerDocId = document.getElementById('config-template-offer-id').value.trim();
+    const appDocId = document.getElementById('config-template-app-id').value.trim();
+    
+    const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+
+    if (!folderId) {
+      const errFolder = currentLang === 'vi' ? 'Folder ID là thông tin bắt buộc.' : 'CV Folder ID is required.';
+      showToast(errFolder, 'error');
+      return;
+    }
+
+    const loadMsg = currentLang === 'vi' ? 'Đang cập nhật cài đặt...' : 'Updating settings...';
+    showLoading(loadMsg);
+    
+    runBackend('saveConfig', {
+      cv_folder_id: folderId,
+      target_email_to_scan: targetEmail,
+      template_interview: templateInterview,
+      template_rejection: templateRejection,
+      company_name: compName,
+      company_phone: compPhone,
+      company_address: compAddr,
+      template_offer_doc_id: offerDocId,
+      template_app_doc_id: appDocId
+    })
+      .then(res => {
+        hideLoading();
+        const successMsg = currentLang === 'vi' ? 'Đã lưu cấu hình thành công!' : 'Configurations updated successfully!';
+        showToast(successMsg, 'success');
+        loadSettingsForm();
+      })
+      .catch(err => {
+        hideLoading();
+        showToast('Failed: ' + err.message, 'error');
+      });
+  }
+
+  function reinitializeDatabase() {
+    const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+    const confirmMsg = currentLang === 'vi' 
+      ? 'Bạn có chắc chắn muốn đặt lại cơ sở dữ liệu? Tất cả dữ liệu ứng viên hiện tại sẽ được bảo toàn.'
+      : 'Are you sure you want to reinitialize database? Existing candidate records will be preserved.';
+      
+    if (!confirm(confirmMsg)) {
+      return;
+    }
+
+    const loadMsg = currentLang === 'vi' ? 'Đang khởi tạo lại database...' : 'Reinitializing database...';
+    showLoading(loadMsg);
+    
+    runBackend('initializeDatabaseV2')
+      .then(res => {
+        hideLoading();
+        const successMsg = currentLang === 'vi' ? 'Đã đặt lại và xác minh database!' : 'Database reset complete!';
+        showToast(successMsg, 'success');
+        loadSettingsForm();
+      })
+      .catch(err => {
+        hideLoading();
+        showToast('Failed: ' + err.message, 'error');
+      });
+  }
+
+  function handlePasswordChange() {
+    const oldPw = document.getElementById('pw-old').value;
+    const newPw = document.getElementById('pw-new').value;
+    const confirmPw = document.getElementById('pw-confirm').value;
+    const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
+
+    if (!oldPw || !newPw || !confirmPw) {
+      const errFill = currentLang === 'vi' ? 'Vui lòng điền đủ thông tin các ô mật khẩu.' : 'Please fill all password fields.';
+      showToast(errFill, 'warning');
+      return;
+    }
+
+    if (newPw !== confirmPw) {
+      const errMatch = currentLang === 'vi' ? 'Mật khẩu mới không trùng khớp.' : 'New passwords do not match.';
+      showToast(errMatch, 'error');
+      return;
+    }
+
+    if (newPw.length < 6) {
+      const errLen = currentLang === 'vi' ? 'Mật khẩu mới phải từ 6 ký tự trở lên.' : 'New password must be at least 6 characters.';
+      showToast(errLen, 'warning');
+      return;
+    }
+
+    const loadMsg = currentLang === 'vi' ? 'Đang cập nhật mật khẩu...' : 'Updating password...';
+    showLoading(loadMsg);
+    
+    const userStr = localStorage.getItem('recruitment_user');
+    const userObj = userStr ? JSON.parse(userStr) : null;
+    const username = userObj ? userObj.username : 'admin';
+
+    runBackend('changePassword', username, oldPw, newPw)
+      .then(result => {
+        hideLoading();
+        if (result.success) {
+          const successMsg = currentLang === 'vi' ? 'Đã đổi mật khẩu thành công!' : 'Password updated successfully!';
+          showToast(successMsg, 'success');
+          document.getElementById('pw-old').value = '';
+          document.getElementById('pw-new').value = '';
+          document.getElementById('pw-confirm').value = '';
+        } else {
+          showToast(result.message, 'error');
+        }
+      })
+      .catch(err => {
+        hideLoading();
+        showToast('Failed: ' + err.message, 'error');
+      });
+  }
+
+  function openDriveGuide() {
+    document.getElementById('modal-drive-guide').classList.remove('hidden');
+  }
+
+  function closeDriveGuide() {
+    document.getElementById('modal-drive-guide').classList.add('hidden');
+  }
+</script>

@@ -1,0 +1,257 @@
+<!-- Category Manager Component -->
+<div id="category-manager-module" class="space-y-6 animate-fade-in" x-data="categoryState" x-cloak x-show="activeTab === 'settings' && activeSubTab === 'categories'">
+  
+  <!-- Page Header -->
+  <div class="glass-card p-6 rounded-3xl border border-slate-800/80 flex flex-col md:flex-row md:items-center md:justify-between gap-4 shadow-xl">
+    <div>
+      <div class="flex items-center gap-2">
+        <h2 class="text-xl font-extrabold text-white">Quản lý Danh mục (Master Data)</h2>
+        <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold bg-indigo-500/20 text-indigo-300 border border-indigo-500/30">System Master Data</span>
+      </div>
+      <p class="text-xs text-slate-400 mt-1">Cấu hình các danh mục phòng ban, hợp đồng, phụ cấp và các thông tin cơ sở của doanh nghiệp</p>
+    </div>
+    <button @click="openAddModal" class="flex items-center gap-2 px-5 py-3 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/25 active:scale-95 transition-all cursor-pointer">
+      <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4.5v15m7.5-7.5h-15"></path></svg>
+      Thêm mới Danh mục
+    </button>
+  </div>
+
+  <!-- Inner Tabs for Category Types -->
+  <div class="flex items-center gap-1.5 p-1 bg-slate-900/90 rounded-2xl border border-slate-800 text-xs font-bold shadow-md overflow-x-auto">
+    <button @click="currentType = 'Department'" :class="currentType === 'Department' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'" class="py-2.5 px-5 rounded-xl transition-all cursor-pointer">Phòng ban</button>
+    <button @click="currentType = 'ContractType'" :class="currentType === 'ContractType' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'" class="py-2.5 px-5 rounded-xl transition-all cursor-pointer">Loại hợp đồng</button>
+    <button @click="currentType = 'Allowance'" :class="currentType === 'Allowance' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'" class="py-2.5 px-5 rounded-xl transition-all cursor-pointer">Phụ cấp</button>
+    <button @click="currentType = 'Qualification'" :class="currentType === 'Qualification' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'" class="py-2.5 px-5 rounded-xl transition-all cursor-pointer">Trình độ chuyên môn</button>
+    <button @click="currentType = 'Relation'" :class="currentType === 'Relation' ? 'bg-indigo-600 text-white shadow-md' : 'text-slate-400 hover:text-white'" class="py-2.5 px-5 rounded-xl transition-all cursor-pointer">Quan hệ gia đình</button>
+  </div>
+
+  <!-- List Grid Table -->
+  <div class="glass-card rounded-3xl overflow-hidden shadow-xl border border-slate-800/80">
+    <div class="overflow-x-auto">
+      <table class="w-full text-left text-xs glass-table">
+        <thead>
+          <tr>
+            <th class="p-4 font-bold text-slate-300 uppercase">Mã</th>
+            <th class="p-4 font-bold text-slate-300 uppercase">Tên hiển thị</th>
+            <template x-if="currentType === 'ContractType'">
+              <th class="p-4 font-bold text-slate-300 uppercase">Thời hạn (Tháng)</th>
+            </template>
+            <template x-if="currentType === 'Allowance'">
+              <th class="p-4 font-bold text-slate-300 uppercase text-right">Số tiền mặc định</th>
+            </template>
+            <th class="p-4 font-bold text-slate-300 uppercase">Mô tả / Ghi chú</th>
+            <th class="p-4 font-bold text-slate-300 uppercase text-center">Thao tác</th>
+          </tr>
+        </thead>
+        <tbody class="divide-y divide-slate-800/50">
+          <template x-for="cat in filteredCategories" :key="cat.id">
+            <tr class="hover:bg-slate-800/30 transition-colors">
+              <td class="p-4 font-bold text-indigo-400 font-mono" x-text="cat.code || cat.id"></td>
+              <td class="p-4 font-bold text-white" x-text="cat.name"></td>
+              <template x-if="currentType === 'ContractType'">
+                <td class="p-4 font-semibold text-slate-200 font-mono" x-text="cat.value ? `${cat.value} tháng` : 'Vô thời hạn'"></td>
+              </template>
+              <template x-if="currentType === 'Allowance'">
+                <td class="p-4 text-right font-extrabold text-emerald-400" x-text="formatCurrency(cat.value)"></td>
+              </template>
+              <td class="p-4 text-slate-400" x-text="cat.description || '-'"></td>
+              <td class="p-4">
+                <div class="flex items-center justify-center gap-2">
+                  <button @click="openEditModal(cat)" class="p-2 rounded-xl bg-slate-900 border border-slate-700/60 hover:bg-slate-800 text-indigo-400 hover:text-white transition-all cursor-pointer" title="Chỉnh sửa">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"></path></svg>
+                  </button>
+                  <button @click="deleteItem(cat.id)" class="p-2 rounded-xl bg-slate-900 border border-slate-700/60 hover:bg-rose-900/40 text-rose-400 hover:text-white transition-all cursor-pointer" title="Xóa">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M14.74 9l-.346 9m-4.788 0L9.26 9m9.968-3.21c.342.052.682.107 1.022.166m-1.022-.165L18.16 19.673a2.25 2.25 0 01-2.244 2.077H8.084a2.25 2.25 0 01-2.244-2.077L4.772 5.79m14.456 0a48.108 48.108 0 00-3.478-.397m-12 .562c.34-.059.68-.114 1.022-.165m0 0a48.11 48.11 0 013.478-.397m7.5 0v-.916c0-1.18-.91-2.164-2.09-2.201a51.964 51.964 0 00-3.32 0c-1.18.037-2.09 1.022-2.09 2.201v.916m7.5 0a48.667 48.667 0 00-7.5 0"></path></svg>
+                  </button>
+                </div>
+              </td>
+            </tr>
+          </template>
+          <template x-if="filteredCategories.length === 0">
+            <tr>
+              <td colspan="6" class="p-8 text-center text-slate-400 italic">Không có bản ghi danh mục nào tồn tại.</td>
+            </tr>
+          </template>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- ADD / EDIT MODAL -->
+  <div x-show="showModal" class="fixed inset-0 bg-slate-950/80 backdrop-blur-md z-50 flex items-center justify-center p-4" x-cloak>
+    <div class="glass-card border border-slate-800 rounded-3xl p-6 md:p-8 max-w-md w-full space-y-6 shadow-2xl relative">
+      <h3 class="text-base font-extrabold text-white" x-text="editMode ? 'Cập nhật Danh mục' : 'Thêm Danh mục Mới'"></h3>
+      
+      <div class="space-y-4 text-xs">
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Loại danh mục</label>
+          <select x-model="formCat.categoryType" class="w-full px-4 py-3 rounded-xl glass-input bg-slate-900 font-semibold" disabled>
+            <option value="Department">Phòng ban</option>
+            <option value="ContractType">Loại hợp đồng</option>
+            <option value="Allowance">Phụ cấp</option>
+            <option value="Qualification">Trình độ chuyên môn</option>
+            <option value="Relation">Quan hệ gia đình</option>
+          </select>
+        </div>
+        
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Mã danh mục</label>
+          <input type="text" x-model="formCat.code" placeholder="Ví dụ: TECH, MKT, PROBATION..." class="w-full px-4 py-3 rounded-xl glass-input font-mono">
+        </div>
+
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Tên hiển thị</label>
+          <input type="text" x-model="formCat.name" placeholder="Ví dụ: Phòng Kỹ Thuật, Cử nhân..." class="w-full px-4 py-3 rounded-xl glass-input font-bold">
+        </div>
+
+        <!-- Conditional input based on Category Type -->
+        <template x-if="currentType === 'ContractType'">
+          <div>
+            <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Thời hạn hợp đồng (Tháng)</label>
+            <input type="number" x-model="formCat.value" placeholder="Ví dụ: 12 (nhập 0 nếu vô thời hạn)" class="w-full px-4 py-3 rounded-xl glass-input font-mono">
+          </div>
+        </template>
+        <template x-if="currentType === 'Allowance'">
+          <div>
+            <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Số tiền mặc định (VND)</label>
+            <input type="number" x-model="formCat.value" placeholder="Ví dụ: 730000" class="w-full px-4 py-3 rounded-xl glass-input font-bold text-emerald-300">
+          </div>
+        </template>
+
+        <div>
+          <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider">Mô tả / Ghi chú</label>
+          <textarea x-model="formCat.description" rows="3" placeholder="Ghi chú chi tiết về danh mục..." class="w-full px-4 py-3 rounded-xl glass-input"></textarea>
+        </div>
+      </div>
+      
+      <div class="flex justify-end gap-3 border-t border-slate-800 pt-4">
+        <button @click="showModal = false" class="px-5 py-2.5 border border-slate-700/80 hover:bg-slate-800 text-slate-300 rounded-xl text-xs font-bold transition-all cursor-pointer">Hủy bỏ</button>
+        <button @click="saveItem" class="px-6 py-2.5 bg-indigo-600 hover:bg-indigo-500 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/25 active:scale-95 transition-all cursor-pointer">Lưu thông tin</button>
+      </div>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  document.addEventListener('alpine:init', () => {
+    if (!Alpine.store('categoryStateRegistered')) {
+      Alpine.store('categoryStateRegistered', true);
+      
+      Alpine.data('categoryState', () => ({
+        categories: [],
+        currentType: 'Department',
+        showModal: false,
+        editMode: false,
+        formCat: {
+          id: '',
+          categoryType: 'Department',
+          code: '',
+          name: '',
+          value: '',
+          description: ''
+        },
+
+        init() {
+          this.loadCategories();
+          window.addEventListener('nav-changed', (e) => {
+            if (e.detail === 'category-manager') {
+              this.loadCategories();
+            }
+          });
+        },
+
+        loadCategories() {
+          showLoading('Đang tải dữ liệu danh mục...');
+          runBackend('getCategories')
+            .then(data => {
+              this.categories = data;
+              hideLoading();
+            })
+            .catch(err => {
+              hideLoading();
+              Swal.fire('Lỗi', 'Không thể tải danh sách danh mục: ' + err.message, 'error');
+            });
+        },
+
+        get filteredCategories() {
+          return this.categories.filter(c => c.categoryType === this.currentType);
+        },
+
+        openAddModal() {
+          this.editMode = false;
+          this.formCat = {
+            id: '',
+            categoryType: this.currentType,
+            code: '',
+            name: '',
+            value: '',
+            description: ''
+          };
+          this.showModal = true;
+        },
+
+        openEditModal(cat) {
+          this.editMode = true;
+          this.formCat = { ...cat };
+          this.showModal = true;
+        },
+
+        saveItem() {
+          if (!this.formCat.name) {
+            Swal.fire('Chú ý', 'Vui lòng điền tên hiển thị của danh mục.', 'warning');
+            return;
+          }
+          if (!this.formCat.code) {
+            this.formCat.code = this.formCat.name.replace(/\s+/g, '_').toUpperCase();
+          }
+
+          showLoading('Đang lưu trữ dữ liệu...');
+          const action = this.editMode ? 'updateCategory' : 'addCategory';
+          
+          runBackend(action, this.formCat)
+            .then(res => {
+              hideLoading();
+              this.showModal = false;
+              Swal.fire('Thành công', 'Đã lưu danh mục thành công!', 'success');
+              this.loadCategories();
+            })
+            .catch(err => {
+              hideLoading();
+              Swal.fire('Lỗi', 'Không thể hoàn tất thao tác: ' + err.message, 'error');
+            });
+        },
+
+        deleteItem(id) {
+          Swal.fire({
+            title: 'Xác nhận xóa?',
+            text: 'Dữ liệu danh mục bị xóa sẽ không thể phục hồi.',
+            icon: 'warning',
+            showCancelButton: true,
+            confirmButtonText: 'Đồng ý xóa',
+            cancelButtonText: 'Hủy bỏ'
+          }).then((result) => {
+            if (result.isConfirmed) {
+              showLoading('Đang thực hiện xóa...');
+              runBackend('deleteCategory', id)
+                .then(() => {
+                  hideLoading();
+                  Swal.fire('Đã xóa', 'Danh mục đã được gỡ bỏ.', 'success');
+                  this.loadCategories();
+                })
+                .catch(err => {
+                  hideLoading();
+                  Swal.fire('Lỗi', 'Không thể xóa danh mục: ' + err.message, 'error');
+                });
+            }
+          });
+        },
+
+        formatCurrency(val) {
+          if (!val) return '0 VND';
+          return Number(val).toLocaleString('vi-VN') + ' VND';
+        }
+      }));
+    }
+  });
+</script>
