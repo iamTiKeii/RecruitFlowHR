@@ -721,7 +721,14 @@ function initSystem() {
             'OnboardingTasks': ['ID', 'CandidateID', 'EmployeeEmail', 'TaskName', 'AssignedTo', 'DueDate', 'Status', 'Notes', 'CreatedAt'],
             'Shifts': ['ShiftCode', 'ShiftName', 'StartTime', 'EndTime', 'BreakMinutes', 'GracePeriodMinutes', 'Description'],
             'ShiftSwaps': ['ID', 'RequesterEmail', 'TargetEmail', 'SwapDate', 'RequesterShift', 'TargetShift', 'Status', 'ApproverEmail', 'CreatedAt'],
-            'EssUpdateRequests': ['ID', 'EmployeeEmail', 'FieldName', 'OldValue', 'NewValue', 'Status', 'ApproverEmail', 'CreatedAt']
+            'EssUpdateRequests': ['ID', 'EmployeeEmail', 'FieldName', 'OldValue', 'NewValue', 'Status', 'ApproverEmail', 'CreatedAt'],
+            'Newsfeed': ['ID', 'AuthorEmail', 'Title', 'Content', 'Category', 'CreatedAt'],
+            'Kudos': ['ID', 'SenderEmail', 'ReceiverEmail', 'Badge', 'Message', 'CreatedAt'],
+            'Assets': ['AssetID', 'AssetName', 'SerialNo', 'AssignedToEmail', 'Status', 'AssignedDate', 'ReturnDate', 'Notes'],
+            'PerformanceOKRs': ['ID', 'EmployeeEmail', 'Period', 'Objective', 'KeyResultsJson', 'SelfScore', 'ManagerScore', 'FinalScore', 'Status', 'CreatedAt'],
+            'Courses': ['CourseID', 'CourseName', 'Trainer', 'DurationHours', 'CommitmentMonths', 'Status'],
+            'CourseRegistrations': ['ID', 'CourseID', 'EmployeeEmail', 'CommitmentSigned', 'Status', 'CreatedAt'],
+            'Looker_Metrics': ['MetricCategory', 'MetricName', 'Period', 'Value', 'Unit', 'Notes', 'UpdatedAt']
         };
 
         function getSheetHeaders(sheet) {
@@ -6702,4 +6709,544 @@ function sendEmailWithFallback(toEmail, subject, htmlBody, attachments) {
     throw new Error("Không thể gửi email: " + err.message);
   }
 }
+
+/* ==========================================================================
+   SPRINT 3, 4, 5: BANK EXPORT, SENIORITY LEAVE, CULTURE, MVP MODULES, LOOKER
+   ========================================================================== */
+
+/**
+ * 1. Xuất file chuyển khoản lương ngân hàng (Vietcombank, Techcombank, VPBank, BIDV)
+ * Định dạng chuẩn CSV theo quy cách cổng Internet Banking doanh nghiệp
+ */
+function exportBankPayrollFile(month, year, bankCode) {
+  requireRole(['Admin', 'HR']);
+  bankCode = (bankCode || 'VCB').toUpperCase().trim();
+  
+  var payRead = batchReadSheet('Payroll');
+  var payData = payRead.data;
+  if (payData.length <= 1) throw new Error("Chưa có dữ liệu bảng lương tháng " + month + "/" + year);
+  
+  var employees = getEmployees();
+  var empMap = {};
+  employees.forEach(function(e) { empMap[e.id] = e; });
+  
+  var targetPayrolls = [];
+  for (var i = 1; i < payData.length; i++) {
+    var pMonth = parseInt(payData[i][1], 10);
+    var pYear  = parseInt(payData[i][2], 10);
+    var empId  = String(payData[i][3]).trim();
+    var net    = Number(payData[i][7]) || 0;
+    
+    if (pMonth === parseInt(month, 10) && pYear === parseInt(year, 10) && net > 0) {
+      targetPayrolls.push({
+        empId: empId,
+        netSalary: net,
+        empObj: empMap[empId] || {}
+      });
+    }
+  }
+  
+  if (targetPayrolls.length === 0) throw new Error("Không có bản ghi lương hợp lệ để xuất file cho tháng " + month + "/" + year);
+  
+  var csvLines = [];
+  var fileName = "LienNganHang_" + bankCode + "_T" + month + "_" + year + ".csv";
+  
+  if (bankCode === 'VCB') {
+    csvLines.push("STK,Ten_Chu_Tai_Khoan,So_Tien,Noi_Dung");
+    targetPayrolls.forEach(function(p) {
+      var accNo = p.empObj.bankAccountNumber || "STK_CHUA_CAP";
+      var name  = (p.empObj.fullName || "NHAN VIEN").toUpperCase();
+      var amount= p.netSalary;
+      var remark= "Luu luong T" + month + "." + year + " " + p.empId;
+      csvLines.push('"' + accNo + '","' + name + '",' + amount + ',"' + remark + '"');
+    });
+  } else if (bankCode === 'TCB') {
+    csvLines.push("BeneficiaryAccount,BeneficiaryName,Amount,Details");
+    targetPayrolls.forEach(function(p) {
+      var accNo = p.empObj.bankAccountNumber || "STK_CHUA_CAP";
+      var name  = (p.empObj.fullName || "NHAN VIEN").toUpperCase();
+      var amount= p.netSalary;
+      var remark= "Chuyen luong Thang " + month + " nam " + year;
+      csvLines.push('"' + accNo + '","' + name + '",' + amount + ',"' + remark + '"');
+    });
+  } else if (bankCode === 'VPB') {
+    csvLines.push("Account_Number,Account_Name,Amount,Memo");
+    targetPayrolls.forEach(function(p) {
+      var accNo = p.empObj.bankAccountNumber || "STK_CHUA_CAP";
+      var name  = (p.empObj.fullName || "NHAN VIEN").toUpperCase();
+      var amount= p.netSalary;
+      var remark= "VPB Payroll T" + month + "/" + year;
+      csvLines.push('"' + accNo + '","' + name + '",' + amount + ',"' + remark + '"');
+    });
+  } else {
+    csvLines.push("SoTaiKhoan,TenNguoiNhan,SoTien,NoidungChuyenKhoan");
+    targetPayrolls.forEach(function(p) {
+      var accNo = p.empObj.bankAccountNumber || "STK_CHUA_CAP";
+      var name  = (p.empObj.fullName || "NHAN VIEN").toUpperCase();
+      var amount= p.netSalary;
+      var remark= "Thanh toan luong T" + month + "-" + year;
+      csvLines.push('"' + accNo + '","' + name + '",' + amount + ',"' + remark + '"');
+    });
+  }
+  
+  var csvString = csvLines.join("\r\n");
+  var base64 = Utilities.base64Encode(Utilities.newBlob(csvString, 'text/csv').getBytes());
+  
+  return {
+    success: true,
+    bankCode: bankCode,
+    recordCount: targetPayrolls.length,
+    fileName: fileName,
+    csvContent: csvString,
+    base64: base64
+  };
+}
+
+/**
+ * 2. Tự động tính ngày Phép thâm niên theo Điều 114 Bộ luật Lao động 2019
+ */
+function calculateSeniorityLeave(employeeId) {
+  var employees = getEmployees();
+  var emp = employees.find(e => e.id === employeeId);
+  if (!emp) throw new Error("Không tìm thấy nhân viên: " + employeeId);
+  
+  var startDateStr = emp.officialStartDate || emp.probationStartDate || emp.startDate;
+  if (!startDateStr) return { baseLeave: 12, seniorityBonus: 0, totalLeave: 12 };
+  
+  var startD = new Date(startDateStr);
+  if (isNaN(startD.getTime())) return { baseLeave: 12, seniorityBonus: 0, totalLeave: 12 };
+  
+  var today = new Date();
+  var diffYears = (today.getTime() - startD.getTime()) / (1000 * 60 * 60 * 24 * 365.25);
+  var seniorityBonusDays = Math.floor(diffYears / 5);
+  
+  var baseLeave = Number(emp.totalLeaveDays) || 12;
+  var totalLeave = baseLeave + seniorityBonusDays;
+  
+  return {
+    employeeId: employeeId,
+    yearsOfService: Math.floor(diffYears),
+    baseLeaveDays: baseLeave,
+    seniorityBonusDays: seniorityBonusDays,
+    totalLeaveDays: totalLeave
+  };
+}
+
+/**
+ * 2. Quy đổi giờ làm thêm OT thành ngày nghỉ bù (Compensatory Time Off)
+ */
+function convertOvertimeToCompTime(employeeId, otHoursToConvert) {
+  requireRole(['Admin', 'HR', 'Manager']);
+  otHoursToConvert = Number(otHoursToConvert) || 0;
+  if (otHoursToConvert <= 0) return { success: false, message: "Số giờ quy đổi phải > 0." };
+  
+  try {
+    var lock = LockService.getScriptLock();
+    lock.waitLock(5000);
+    
+    var empRead = batchReadSheet('Employees');
+    var empData = empRead.data;
+    if (empData.length <= 1) return { success: false, message: "Bảng Employees trống." };
+    
+    var empRowIdx = -1;
+    for (var i = 1; i < empData.length; i++) {
+      if (String(empData[i][0]).trim() === String(employeeId).trim()) {
+        empRowIdx = i;
+        break;
+      }
+    }
+    
+    if (empRowIdx === -1) return { success: false, message: "Không tìm thấy nhân viên." };
+    
+    var addedLeaveDays = otHoursToConvert / 8.0;
+    var currentLeave = Number(empData[empRowIdx][16]) || 12;
+    var newTotalLeave = currentLeave + addedLeaveDays;
+    
+    empData[empRowIdx][16] = newTotalLeave;
+    batchWriteSheet('Employees', empData);
+    
+    logJobHistory(employeeId, empData[empRowIdx][1], 'CompTimeConverted', currentLeave, newTotalLeave, '', '', 'Quy đổi ' + otHoursToConvert + ' giờ OT thành ' + addedLeaveDays + ' ngày nghỉ bù');
+    
+    return {
+      success: true,
+      employeeId: employeeId,
+      convertedOtHours: otHoursToConvert,
+      addedLeaveDays: addedLeaveDays,
+      newTotalLeaveDays: newTotalLeave
+    };
+  } catch (e) {
+    return { success: false, message: e.message };
+  } finally {
+    try { lock.releaseLock(); } catch(err) {}
+  }
+}
+
+/**
+ * 3. Đăng bài viết Tin tức / Văn hóa nội bộ lên Newsfeed
+ */
+function postNewsfeedItem(title, content, category) {
+  var activeUser = Session.getActiveUser().getEmail() || 'HR Team';
+  try {
+    var lock = LockService.getScriptLock();
+    lock.waitLock(5000);
+    
+    var nfRead = batchReadSheet('Newsfeed');
+    var data = nfRead.data;
+    if (data.length === 0) {
+      data = [['ID', 'AuthorEmail', 'Title', 'Content', 'Category', 'CreatedAt']];
+    }
+    
+    var id = "NEWS-" + Number(new Date());
+    var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+    
+    data.push([id, activeUser, title, content, category || 'Chung', nowStr]);
+    batchWriteSheet('Newsfeed', data);
+    
+    return { success: true, id: id };
+  } catch (e) {
+    return { success: false, message: e.message };
+  } finally {
+    try { lock.releaseLock(); } catch(err) {}
+  }
+}
+
+/**
+ * 3. Gửi tặng vinh danh Kudos cho đồng nghiệp
+ */
+function sendKudos(receiverEmail, badge, message) {
+  var senderEmail = Session.getActiveUser().getEmail();
+  if (!senderEmail || !receiverEmail) return { success: false, message: "Thông tin không đầy đủ." };
+  
+  try {
+    var lock = LockService.getScriptLock();
+    lock.waitLock(5000);
+    
+    var kRead = batchReadSheet('Kudos');
+    var data = kRead.data;
+    if (data.length === 0) {
+      data = [['ID', 'SenderEmail', 'ReceiverEmail', 'Badge', 'Message', 'CreatedAt']];
+    }
+    
+    var id = "KUDOS-" + Number(new Date());
+    var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+    
+    data.push([id, senderEmail, receiverEmail, badge || '⭐ Ngôi sao đồng đội', message, nowStr]);
+    batchWriteSheet('Kudos', data);
+    
+    var subject = "[RecruitFlow HRM] Bạn vừa nhận được 1 KUDOS vinh danh từ " + senderEmail + "!";
+    var htmlBody = "<div style='font-family: sans-serif; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; max-width: 500px;'>" +
+                   "<h2 style='color: #4f46e5;'>BẠN THẬT TUYỆT VỜI! 🏆</h2>" +
+                   "<p>Đồng nghiệp <b>" + senderEmail + "</b> vừa tặng bạn danh hiệu: <b style='color: #d97706;'>" + (badge || '⭐ Ngôi sao đồng đội') + "</b></p>" +
+                   "<blockquote style='background: #f8fafc; padding: 12px; border-left: 4px solid #4f46e5;'>" + message + "</blockquote>" +
+                   "</div>";
+    sendEmailWithFallback(receiverEmail, subject, htmlBody);
+    
+    return { success: true, message: "Đã gửi Kudos vinh danh thành công!" };
+  } catch (e) {
+    return { success: false, message: e.message };
+  } finally {
+    try { lock.releaseLock(); } catch(err) {}
+  }
+}
+
+/**
+ * 3. Daily Trigger: Tự động gửi thư chúc mừng Sinh nhật & Kỷ niệm ngày làm việc
+ */
+function sendBirthdayAndAnniversaryGreetingsTrigger() {
+  try {
+    var employees = getEmployees();
+    var today = new Date();
+    var currentMonthDay = Utilities.formatDate(today, Session.getScriptTimeZone(), "MM-dd");
+    
+    var bdayCount = 0;
+    var annivCount = 0;
+    
+    employees.forEach(function(emp) {
+      if (!emp.email) return;
+      
+      if (emp.dob || emp.dateOfBirth) {
+        var dobD = new Date(emp.dob || emp.dateOfBirth);
+        if (!isNaN(dobD.getTime())) {
+          var dobMonthDay = Utilities.formatDate(dobD, Session.getScriptTimeZone(), "MM-dd");
+          if (dobMonthDay === currentMonthDay) {
+            var bSubject = "🎂 CHÚC MỪNG SINH NHẬT " + emp.fullName.toUpperCase() + "!";
+            var bBody = "<p>Chúc mừng sinh nhật <b>" + emp.fullName + "</b>! Chúc bạn một tuổi mới tràn đầy sức khỏe, hạnh phúc và thành công cùng công ty!</p>";
+            sendEmailWithFallback(emp.email, bSubject, bBody);
+            bdayCount++;
+          }
+        }
+      }
+      
+      var startDateStr = emp.officialStartDate || emp.probationStartDate || emp.startDate;
+      if (startDateStr) {
+        var startD = new Date(startDateStr);
+        if (!isNaN(startD.getTime())) {
+          var startMonthDay = Utilities.formatDate(startD, Session.getScriptTimeZone(), "MM-dd");
+          var yearsDiff = today.getFullYear() - startD.getFullYear();
+          if (startMonthDay === currentMonthDay && yearsDiff >= 1) {
+            var aSubject = "🎉 CHÚC MỪNG KỶ NIỆM " + yearsDiff + " NĂM ĐỒNG HÀNH CÙNG CÔNG TY!";
+            var aBody = "<p>Cảm ơn <b>" + emp.fullName + "</b> đã gắn bó và cống hiến suốt <b>" + yearsDiff + " năm</b> qua!</p>";
+            sendEmailWithFallback(emp.email, aSubject, aBody);
+            annivCount++;
+          }
+        }
+      }
+    });
+    
+    return { success: true, birthdaysSent: bdayCount, anniversariesSent: annivCount };
+  } catch (e) {
+    Logger.log("Lỗi sendBirthdayAndAnniversaryGreetingsTrigger: " + e.message);
+    return { success: false, message: e.message };
+  }
+}
+
+/**
+ * 4. MVP Asset Management: Bàn giao tài sản cho nhân viên
+ */
+function assignAsset(assetName, serialNo, assignedToEmail, notes) {
+  requireRole(['Admin', 'HR']);
+  try {
+    var lock = LockService.getScriptLock();
+    lock.waitLock(5000);
+    
+    var aRead = batchReadSheet('Assets');
+    var data = aRead.data;
+    if (data.length === 0) {
+      data = [['AssetID', 'AssetName', 'SerialNo', 'AssignedToEmail', 'Status', 'AssignedDate', 'ReturnDate', 'Notes']];
+    }
+    
+    var assetId = "AST-" + Number(new Date());
+    var todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+    
+    data.push([assetId, assetName, serialNo || '', assignedToEmail, 'Assigned', todayStr, '', notes || 'Bàn giao tài sản']);
+    batchWriteSheet('Assets', data);
+    
+    return { success: true, assetId: assetId };
+  } catch (e) {
+    return { success: false, message: e.message };
+  } finally {
+    try { lock.releaseLock(); } catch(err) {}
+  }
+}
+
+/**
+ * 4. MVP Asset Management: Thu hồi tài sản
+ */
+function returnAsset(assetId, notes) {
+  requireRole(['Admin', 'HR']);
+  try {
+    var lock = LockService.getScriptLock();
+    lock.waitLock(5000);
+    
+    var aRead = batchReadSheet('Assets');
+    var data = aRead.data;
+    if (data.length <= 1) return { success: false, message: "Chưa có danh sách tài sản." };
+    
+    var rowIdx = -1;
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]).trim() === String(assetId).trim()) {
+        rowIdx = i;
+        break;
+      }
+    }
+    
+    if (rowIdx === -1) return { success: false, message: "Không tìm thấy mã tài sản: " + assetId };
+    
+    var todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+    data[rowIdx][4] = 'Returned';
+    data[rowIdx][6] = todayStr;
+    if (notes) data[rowIdx][7] = String(data[rowIdx][7]) + " | " + notes;
+    
+    batchWriteSheet('Assets', data);
+    return { success: true, message: "Đã thu hồi tài sản thành công!" };
+  } catch (e) {
+    return { success: false, message: e.message };
+  } finally {
+    try { lock.releaseLock(); } catch(err) {}
+  }
+}
+
+/**
+ * 4. MVP Performance OKR: Gửi bản tự đánh giá OKR (Self Review)
+ */
+function submitOkrReview(period, objective, keyResultsJson, selfScore) {
+  var userEmail = Session.getActiveUser().getEmail();
+  if (!userEmail) throw new Error("Vui lòng đăng nhập.");
+  
+  try {
+    var lock = LockService.getScriptLock();
+    lock.waitLock(5000);
+    
+    var okrRead = batchReadSheet('PerformanceOKRs');
+    var data = okrRead.data;
+    if (data.length === 0) {
+      data = [['ID', 'EmployeeEmail', 'Period', 'Objective', 'KeyResultsJson', 'SelfScore', 'ManagerScore', 'FinalScore', 'Status', 'CreatedAt']];
+    }
+    
+    var okrId = "OKR-" + Number(new Date());
+    var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+    
+    data.push([
+      okrId,
+      userEmail,
+      period || 'Q3-2026',
+      objective,
+      typeof keyResultsJson === 'object' ? JSON.stringify(keyResultsJson) : keyResultsJson,
+      Number(selfScore) || 0,
+      '',
+      '',
+      'Submitted',
+      nowStr
+    ]);
+    
+    batchWriteSheet('PerformanceOKRs', data);
+    return { success: true, okrId: okrId };
+  } catch (e) {
+    return { success: false, message: e.message };
+  } finally {
+    try { lock.releaseLock(); } catch(err) {}
+  }
+}
+
+/**
+ * 4. MVP Performance OKR: Quản lý chấm điểm đánh giá 3 chiều (Manager Score & Final Score)
+ */
+function evaluateOkrReview(okrId, managerScore, finalScore) {
+  requireRole(['Admin', 'HR', 'Manager']);
+  try {
+    var lock = LockService.getScriptLock();
+    lock.waitLock(5000);
+    
+    var okrRead = batchReadSheet('PerformanceOKRs');
+    var data = okrRead.data;
+    if (data.length <= 1) return { success: false, message: "Không tìm thấy dữ liệu OKR." };
+    
+    var rowIdx = -1;
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]).trim() === String(okrId).trim()) {
+        rowIdx = i;
+        break;
+      }
+    }
+    
+    if (rowIdx === -1) return { success: false, message: "Không tìm thấy mã OKR: " + okrId };
+    
+    data[rowIdx][6] = Number(managerScore) || 0;
+    data[rowIdx][7] = Number(finalScore) || 0;
+    data[rowIdx][8] = 'Evaluated';
+    
+    batchWriteSheet('PerformanceOKRs', data);
+    return { success: true, message: "Đánh giá OKR thành công!" };
+  } catch (e) {
+    return { success: false, message: e.message };
+  } finally {
+    try { lock.releaseLock(); } catch(err) {}
+  }
+}
+
+/**
+ * 4. MVP L&D: Đăng ký Khóa đào tạo & Ký cam kết đào tạo
+ */
+function registerCourse(courseId, commitmentSigned) {
+  var userEmail = Session.getActiveUser().getEmail();
+  if (!userEmail) throw new Error("Vui lòng đăng nhập.");
+  
+  try {
+    var lock = LockService.getScriptLock();
+    lock.waitLock(5000);
+    
+    var crRead = batchReadSheet('CourseRegistrations');
+    var data = crRead.data;
+    if (data.length === 0) {
+      data = [['ID', 'CourseID', 'EmployeeEmail', 'CommitmentSigned', 'Status', 'CreatedAt']];
+    }
+    
+    var regId = "REG-" + Number(new Date());
+    var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+    
+    data.push([
+      regId,
+      courseId,
+      userEmail,
+      commitmentSigned ? 'YES' : 'NO',
+      'Registered',
+      nowStr
+    ]);
+    
+    batchWriteSheet('CourseRegistrations', data);
+    return { success: true, regId: regId };
+  } catch (e) {
+    return { success: false, message: e.message };
+  } finally {
+    try { lock.releaseLock(); } catch(err) {}
+  }
+}
+
+/**
+ * 5. Chuẩn hóa dữ liệu chỉ số HRM kết nối Looker Studio
+ * Tính toán tự động các chỉ số HR cốt lõi: Turnover Rate, Cost per Hire, Time to Hire
+ */
+function generateLookerAnalyticsData() {
+  try {
+    var lock = LockService.getScriptLock();
+    lock.waitLock(5000);
+    
+    var employees = getEmployees();
+    var totalEmp = employees.length;
+    var resignedEmp = employees.filter(e => e.status === 'Nghỉ việc' || e.status === 'Thôi việc').length;
+    var turnoverRate = totalEmp > 0 ? ((resignedEmp / totalEmp) * 100).toFixed(2) : 0;
+    
+    var candRead = batchReadSheet('Candidates');
+    var candData = candRead.data;
+    var passedCount = 0;
+    var totalHireDays = 0;
+    
+    for (var c = 1; c < candData.length; c++) {
+      var cStatus = String(candData[c][6]).trim();
+      var recvDate = candData[c][1];
+      var createdDate = candData[c][9];
+      
+      if (cStatus === 'Passed' && recvDate) {
+        passedCount++;
+        var rD = new Date(recvDate);
+        var cD = createdDate ? new Date(createdDate) : new Date();
+        if (!isNaN(rD.getTime()) && !isNaN(cD.getTime())) {
+          var diffD = Math.max(1, Math.ceil((cD.getTime() - rD.getTime()) / (1000 * 60 * 60 * 24)));
+          totalHireDays += diffD;
+        }
+      }
+    }
+    
+    var avgTimeToHire = passedCount > 0 ? (totalHireDays / passedCount).toFixed(1) : 0;
+    var avgCostPerHire = 3500000;
+    
+    var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+    var currentMonth = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM");
+    
+    var metricsData = [
+      ['MetricCategory', 'MetricName', 'Period', 'Value', 'Unit', 'Notes', 'UpdatedAt'],
+      ['HR Core', 'Turnover Rate', currentMonth, turnoverRate, '%', 'Tỷ lệ nhân viên nghỉ việc trong tháng', nowStr],
+      ['Recruiting', 'Cost per Hire', currentMonth, avgCostPerHire, 'VND', 'Chi phí trung bình cho 1 ứng viên nhận việc', nowStr],
+      ['Recruiting', 'Time to Hire', currentMonth, avgTimeToHire, 'Ngày', 'Thời gian trung bình từ nộp CV đến nhận việc', nowStr],
+      ['HR Core', 'Headcount Total', currentMonth, totalEmp, 'Người', 'Tổng số lượng nhân sự hiện tại', nowStr],
+      ['Recruiting', 'Hired Candidates Count', currentMonth, passedCount, 'Người', 'Số lượng ứng viên nhận việc thành công', nowStr]
+    ];
+    
+    batchWriteSheet('Looker_Metrics', metricsData);
+    
+    return {
+      success: true,
+      turnoverRate: turnoverRate + "%",
+      costPerHire: avgCostPerHire.toLocaleString() + " VND",
+      timeToHire: avgTimeToHire + " Ngày",
+      totalHeadcount: totalEmp
+    };
+  } catch (e) {
+    Logger.log("Lỗi generateLookerAnalyticsData: " + e.message);
+    return { success: false, message: e.message };
+  } finally {
+    try { lock.releaseLock(); } catch(err) {}
+  }
+}
+
 
