@@ -436,10 +436,10 @@ function changePassword(usernameOrEmail, oldPassword, newPassword) {
 }
 
 /**
- * Get list of all users for User Management (Admin restricted)
+ * Get all users for User Management (Admin restricted)
  */
-function getUsersList(clientEmail) {
-  requireRole(['Admin'], clientEmail);
+function getUsersList() {
+  requireRole(['Admin']);
   
   var ss = getSpreadsheet();
   var usersSheet = ss.getSheetByName('Users');
@@ -481,8 +481,8 @@ function getUsersList(clientEmail) {
 /**
  * Add or update a user account in Users sheet (Admin restricted)
  */
-function saveUserAccount(userObj, clientEmail) {
-  requireRole(['Admin'], clientEmail);
+function saveUserAccount(userObj) {
+  requireRole(['Admin']);
   
   if (!userObj || !userObj.email || !userObj.fullName || !userObj.role) {
     return { success: false, message: "Vui lòng nhập đầy đủ Email, Họ tên và Vai trò." };
@@ -567,17 +567,17 @@ function saveUserAccount(userObj, clientEmail) {
 /**
  * Delete a user account from Users sheet (Admin restricted)
  */
-function deleteUserAccount(targetEmail, clientEmail) {
-  requireRole(['Admin'], clientEmail);
+function deleteUserAccount(targetEmail) {
+  requireRole(['Admin']);
   
   if (!targetEmail) {
     return { success: false, message: "Email người dùng không hợp lệ." };
   }
   
   var cleanTarget = String(targetEmail).toLowerCase().trim();
-  var cleanClient = String(clientEmail).toLowerCase().trim();
+  var activeEmail = getActiveUserEmail();
   
-  if (cleanTarget === cleanClient) {
+  if (cleanTarget === activeEmail) {
     return { success: false, message: "Bảo mật: Bạn không thể tự xóa tài khoản Admin đang đăng nhập." };
   }
   
@@ -624,8 +624,8 @@ function deleteUserAccount(targetEmail, clientEmail) {
 /**
  * Admin reset password for a user account (Admin restricted)
  */
-function adminResetUserPassword(targetEmail, newPassword, clientEmail) {
-  requireRole(['Admin'], clientEmail);
+function adminResetUserPassword(targetEmail, newPassword) {
+  requireRole(['Admin']);
   
   if (!targetEmail || !newPassword || String(newPassword).trim().length === 0) {
     return { success: false, message: "Email và Mật khẩu mới không được để trống." };
@@ -2619,10 +2619,9 @@ function saveInterviewPlanning(candidateId, interviewerEmail, interviewDate, mee
 /**
  * Filter candidates assigned to the current Interviewer email
  */
-function getInterviewerCandidates(clientEmail) {
-  var activeEmail = clientEmail || Session.getActiveUser().getEmail();
+function getInterviewerCandidates() {
+  var activeEmail = getActiveUserEmail();
   if (!activeEmail) return [];
-  activeEmail = activeEmail.toLowerCase().trim();
   
   var list = getCandidates();
   var filtered = [];
@@ -2638,10 +2637,9 @@ function getInterviewerCandidates(clientEmail) {
 /**
  * Securely fetch candidate CV link if user is authorized.
  */
-function getCandidateCVUrlOrBase64(candidateId, clientEmail) {
-  var activeEmail = clientEmail || Session.getActiveUser().getEmail();
+function getCandidateCVUrlOrBase64(candidateId) {
+  var activeEmail = getActiveUserEmail();
   if (!activeEmail) throw new Error("Yêu cầu xác thực tài khoản.");
-  activeEmail = activeEmail.toLowerCase().trim();
   
   var role = getUserRoleByEmail(activeEmail);
   if (role === 'Admin' || role === 'HR') {
@@ -2687,10 +2685,9 @@ function getCandidateCVData(candidateId) {
 /**
  * Update candidate interview assessment results by Interviewer
  */
-function updateInterviewResult(candidateId, result, offerData, clientEmail) {
-  var activeEmail = clientEmail || Session.getActiveUser().getEmail();
+function updateInterviewResult(candidateId, result, offerData) {
+  var activeEmail = getActiveUserEmail();
   if (!activeEmail) throw new Error("Yêu cầu đăng nhập.");
-  activeEmail = activeEmail.toLowerCase().trim();
   
   // Verify that the candidate is assigned to this interviewer (unless Admin/HR)
   var role = getUserRoleByEmail(activeEmail);
@@ -3680,8 +3677,14 @@ function importAttendanceExcel(dataRows) {
 
 /**
  * Fetch attendance logs based on RBAC filters
+/**
+ * Fetch attendance logs securely (Role & Identity verified on server)
  */
-function getAttendanceLogs(email, role) {
+function getAttendanceLogs(requestedEmail) {
+  var activeEmail = getActiveUserEmail();
+  if (!activeEmail) return [];
+  
+  var role = getUserRoleByEmail(activeEmail);
   var ss = getSpreadsheet();
   var attSheet = ss.getSheetByName('Attendance');
   var empSheet = ss.getSheetByName('Employees');
@@ -3692,7 +3695,7 @@ function getAttendanceLogs(email, role) {
   var empIdToEmailMap = {};
   var empIdToDeptMap = {};
   var targetEmployeeId = "";
-  var userEmail = String(email || "").toLowerCase().trim();
+  var userEmail = (role === 'Admin' || role === 'HR') ? String(requestedEmail || activeEmail).toLowerCase().trim() : activeEmail;
   
   for (var i = 1; i < empData.length; i++) {
     var id = String(empData[i][0]).trim();
@@ -4494,9 +4497,11 @@ function calculatePayroll(month, year) {
   
   var count = 0;
   for (var e = 0; e < activeEmployees.length; e++) {
-    var emp = activeEmployees[e];
-    var basicSalary = emp.basicSalary || 0;
-    var allowance = emp.allowance || 0;
+    var rawBasicSalary = emp.basicSalary || 0;
+    var stdWorkDays = 22;
+    var prorateRatio = calculateProrateRatio(emp, month, year, stdWorkDays);
+    var basicSalary = Math.round(rawBasicSalary * prorateRatio);
+    var allowance = Math.round((emp.allowance || 0) * prorateRatio);
     
     // Total OT Pay from approved OT requests or raw attendance
     var otSalary = approvedOtMap[emp.id] || 0;
@@ -4659,9 +4664,13 @@ function sendPayslips(month, year) {
 }
 
 /**
- * Fetch payroll logs for personal / management views
+ * Fetch payroll logs securely (Role & Identity verified on server)
  */
-function getPayslips(email, role) {
+function getPayslips(requestedEmail) {
+  var activeEmail = getActiveUserEmail();
+  if (!activeEmail) return [];
+  
+  var role = getUserRoleByEmail(activeEmail);
   var ss = getSpreadsheet();
   var paySheet = ss.getSheetByName('Payroll');
   var empSheet = ss.getSheetByName('Employees');
@@ -4672,7 +4681,7 @@ function getPayslips(email, role) {
   var empIdToEmailMap = {};
   var empIdToDeptMap = {};
   var targetEmployeeId = "";
-  var cleanUserEmail = String(email || "").toLowerCase().trim();
+  var cleanUserEmail = (role === 'Admin' || role === 'HR') ? String(requestedEmail || activeEmail).toLowerCase().trim() : activeEmail;
   
   // If input is an employee ID, resolve to their email address first
   if (cleanUserEmail.indexOf("emp-") === 0) {
@@ -6515,11 +6524,11 @@ function reconcileAttendanceLateEarly(month, year) {
 
 /**
  * 5. ESS Portal: Lấy thông tin cá nhân, lịch sử lương, quỹ phép và lịch sử chấm công của nhân viên
+ * Khóa lỗ hổng BFLA: Sử dụng trực tiếp Email từ Server Session
  */
-function getEssProfile(clientEmail) {
-  var activeEmail = clientEmail || Session.getActiveUser().getEmail();
-  if (!activeEmail) throw new Error("Vui lòng đăng nhập để sử dụng Cổng ESS.");
-  activeEmail = activeEmail.toLowerCase().trim();
+function getEssProfile() {
+  var activeEmail = getActiveUserEmail();
+  if (!activeEmail) throw new Error("Bảo mật (BFLA Blocked): Vui lòng xác thực tài khoản để truy cập Cổng ESS.");
   
   var employees = getEmployees();
   var emp = employees.find(e => (e.email || '').toLowerCase().trim() === activeEmail);
@@ -6543,11 +6552,11 @@ function getEssProfile(clientEmail) {
 
 /**
  * 5. ESS Portal: Nhân viên gửi yêu cầu chỉnh sửa thông tin cá nhân (SĐT, Địa chỉ, STK ngân hàng...)
+ * Khóa lỗ hổng BFLA: Sử dụng trực tiếp Email từ Server Session
  */
-function updateEssProfile(clientEmail, updatedFields) {
-  var activeEmail = clientEmail || Session.getActiveUser().getEmail();
-  if (!activeEmail) throw new Error("Vui lòng đăng nhập.");
-  activeEmail = activeEmail.toLowerCase().trim();
+function updateEssProfile(updatedFields) {
+  var activeEmail = getActiveUserEmail();
+  if (!activeEmail) throw new Error("Bảo mật (BFLA Blocked): Vui lòng xác thực tài khoản.");
   
   try {
     var lock = LockService.getScriptLock();
@@ -6588,11 +6597,11 @@ function updateEssProfile(clientEmail, updatedFields) {
 
 /**
  * 5. ESS Portal: Xuất Giấy Xác nhận Công tác / Xác nhận Thu nhập dạng PDF
+ * Khóa lỗ hổng BFLA: Sử dụng trực tiếp Email từ Server Session
  */
-function generateEmploymentVerificationPDF(clientEmail, verificationType) {
-  var activeEmail = clientEmail || Session.getActiveUser().getEmail();
-  if (!activeEmail) throw new Error("Vui lòng đăng nhập.");
-  activeEmail = activeEmail.toLowerCase().trim();
+function generateEmploymentVerificationPDF(verificationType) {
+  var activeEmail = getActiveUserEmail();
+  if (!activeEmail) throw new Error("Bảo mật (BFLA Blocked): Vui lòng xác thực tài khoản.");
   
   var employees = getEmployees();
   var emp = employees.find(e => (e.email || '').toLowerCase().trim() === activeEmail);
@@ -7248,5 +7257,112 @@ function generateLookerAnalyticsData() {
     try { lock.releaseLock(); } catch(err) {}
   }
 }
+
+/**
+ * Tính tỷ lệ Prorate Lương theo Số ngày công thực tế trong tháng
+ * Dành cho nhân sự vào làm giữa tháng hoặc xin nghỉ việc giữa tháng
+ */
+function calculateProrateRatio(emp, month, year, standardWorkDays) {
+  var m = parseInt(month, 10);
+  var y = parseInt(year, 10);
+  var firstDay = new Date(y, m - 1, 1);
+  var lastDay  = new Date(y, m, 0); // Ngày cuối cùng của tháng
+  var totalDaysInMonth = lastDay.getDate();
+  
+  var activeStartDay = 1;
+  var activeEndDay   = totalDaysInMonth;
+  
+  // 1. Kiểm tra Ngày bắt đầu làm việc (vào giữa tháng)
+  var startDateStr = emp.officialStartDate || emp.probationStartDate || emp.startDate;
+  if (startDateStr) {
+    var sD = new Date(startDateStr);
+    if (!isNaN(sD.getTime())) {
+      if (sD.getFullYear() === y && (sD.getMonth() + 1) === m) {
+        activeStartDay = sD.getDate();
+      } else if (sD > lastDay) {
+        return 0; // Chưa bắt đầu đi làm trong tháng này
+      }
+    }
+  }
+  
+  // 2. Kiểm tra Ngày nghỉ việc (nghỉ giữa tháng)
+  var endDateStr = emp.contractExpiryDate || emp.endDate || emp.resignDate;
+  if (endDateStr && (emp.status === 'Nghỉ việc' || emp.status === 'Thôi việc')) {
+    var eD = new Date(endDateStr);
+    if (!isNaN(eD.getTime())) {
+      if (eD.getFullYear() === y && (eD.getMonth() + 1) === m) {
+        activeEndDay = eD.getDate();
+      } else if (eD < firstDay) {
+        return 0; // Đã nghỉ trước tháng này
+      }
+    }
+  }
+  
+  // Trọn tháng -> tỷ lệ 1.0 (100%)
+  if (activeStartDay === 1 && activeEndDay === totalDaysInMonth) {
+    return 1.0;
+  }
+  
+  // Đếm số ngày đi làm thực tế (trừ các ngày Chủ nhật)
+  var activeWorkDaysCount = 0;
+  for (var d = activeStartDay; d <= activeEndDay; d++) {
+    var curD = new Date(y, m - 1, d);
+    if (curD.getDay() !== 0) { // 0: Chủ nhật
+      activeWorkDaysCount++;
+    }
+  }
+  
+  var stdDays = Number(standardWorkDays) || 22;
+  var ratio = activeWorkDaysCount / stdDays;
+  return Math.min(1.0, Math.max(0.0, ratio));
+}
+
+/**
+ * TEST CASE 1: Kiểm thử Prorate Lương cho nhân viên mới vào làm ngày 15/07/2026
+ */
+function testProrateSalaryCaseNewEmployee15th() {
+  var mockEmp = {
+    id: "EMP-TEST-01",
+    fullName: "Nguyễn Văn Mới",
+    officialStartDate: "2026-07-15",
+    basicSalary: 10000000,
+    allowance: 1000000,
+    status: "Chính thức"
+  };
+  var stdDays = 22;
+  var ratio = calculateProrateRatio(mockEmp, 7, 2026, stdDays);
+  var proratedSalary = Math.round(mockEmp.basicSalary * ratio);
+  
+  Logger.log("=== TEST CASE 1: Vào làm ngày 15/07/2026 ===");
+  Logger.log("Tỷ lệ Prorate công: " + (ratio * 100).toFixed(2) + "%");
+  Logger.log("Lương gốc: 10,000,000 VNĐ -> Lương Prorate: " + proratedSalary.toLocaleString() + " VNĐ");
+  
+  return { ratio: ratio, proratedSalary: proratedSalary };
+}
+
+/**
+ * TEST CASE 2: Kiểm thử Prorate Lương cho nhân viên xin nghỉ việc ngày 20/07/2026
+ */
+function testProrateSalaryCaseResignedEmployee20th() {
+  var mockEmp = {
+    id: "EMP-TEST-02",
+    fullName: "Trần Thị Nghỉ",
+    officialStartDate: "2024-01-01",
+    resignDate: "2026-07-20",
+    basicSalary: 10000000,
+    allowance: 1000000,
+    status: "Nghỉ việc"
+  };
+  var stdDays = 22;
+  var ratio = calculateProrateRatio(mockEmp, 7, 2026, stdDays);
+  var proratedSalary = Math.round(mockEmp.basicSalary * ratio);
+  
+  Logger.log("=== TEST CASE 2: Nghỉ việc ngày 20/07/2026 ===");
+  Logger.log("Tỷ lệ Prorate công: " + (ratio * 100).toFixed(2) + "%");
+  Logger.log("Lương gốc: 10,000,000 VNĐ -> Lương Prorate: " + proratedSalary.toLocaleString() + " VNĐ");
+  
+  return { ratio: ratio, proratedSalary: proratedSalary };
+}
+
 
 
