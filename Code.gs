@@ -5547,14 +5547,6 @@ function saveEmployeeDetail(details) {
     }
 }
 
-        return { success: true };
-    } catch (e) {
-        return { success: false, message: e.toString() };
-    } finally {
-        try { lock.releaseLock(); } catch(err) {}
-    }
-}
-
 
 /**
  * Save a family relation row
