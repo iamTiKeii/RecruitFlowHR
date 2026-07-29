@@ -710,14 +710,18 @@ function initSystem() {
             'Attendance': ['ID', 'EmployeeID', 'Date', 'CheckIn', 'CheckOut', 'IPAddress', 'OT_Hours', 'Status'],
             'LeaveRequests': ['ID', 'EmployeeID', 'LeaveType', 'StartDate', 'EndDate', 'Reason', 'Approver', 'Status'],
             'OvertimeRequests': ['ID', 'EmployeeID', 'Date', 'Hours', 'OtType', 'Multiplier', 'Reason', 'Approver', 'Status', 'CreatedAt'],
-            'Payroll': ['ID', 'Month', 'Year', 'EmployeeID', 'TotalSalary', 'Insurance', 'Tax', 'NetSalary', 'SentDate'],
+            'Payroll': ['ID', 'Month', 'Year', 'EmployeeID', 'TotalSalary', 'Insurance', 'Tax', 'NetSalary', 'SentDate', 'KpiBonus', 'SalesCommission', 'ProjectAllowance', 'AdvanceDeduction', 'PenaltyDeduction'],
             'EmployeeDetails': [
                 'EmployeeID', 'FullName', 'Gender', 'BirthPlace', 'CurrentAddress', 'RegisterAddress',
                 'IdentityCardNumber', 'IdentityCardDate', 'IdentityCardPlace', 'AcademicLevel',
                 'Specialization', 'GraduationInstitution', 'YouthUnionDate', 'CommunistPartyDateStatus', 'Docs', 'DateOfBirth', 'Department', 'Dependents'
             ],
             'SalaryHistory': ['ID', 'EmployeeID', 'NewSalary', 'ChangeDate', 'FileBase64', 'Notes'],
-            'JobHistory': ['ID', 'EmployeeID', 'EmployeeName', 'ChangeType', 'OldValue', 'NewValue', 'EffectiveDate', 'DecisionNumber', 'Notes', 'CreatedAt']
+            'JobHistory': ['ID', 'EmployeeID', 'EmployeeName', 'ChangeType', 'OldValue', 'NewValue', 'EffectiveDate', 'DecisionNumber', 'Notes', 'CreatedAt'],
+            'OnboardingTasks': ['ID', 'CandidateID', 'EmployeeEmail', 'TaskName', 'AssignedTo', 'DueDate', 'Status', 'Notes', 'CreatedAt'],
+            'Shifts': ['ShiftCode', 'ShiftName', 'StartTime', 'EndTime', 'BreakMinutes', 'GracePeriodMinutes', 'Description'],
+            'ShiftSwaps': ['ID', 'RequesterEmail', 'TargetEmail', 'SwapDate', 'RequesterShift', 'TargetShift', 'Status', 'ApproverEmail', 'CreatedAt'],
+            'EssUpdateRequests': ['ID', 'EmployeeEmail', 'FieldName', 'OldValue', 'NewValue', 'Status', 'ApproverEmail', 'CreatedAt']
         };
 
         function getSheetHeaders(sheet) {
@@ -782,6 +786,21 @@ function initSystem() {
                     results.push("Đã khởi tạo tham số pháp lý: " + item.key);
                 }
             });
+        }
+        
+        // Khởi tạo 4 ca làm việc mặc định trong bảng Shifts nếu chưa có dữ liệu
+        var shiftSheet = ss.getSheetByName('Shifts');
+        if (shiftSheet && shiftSheet.getLastRow() <= 1) {
+            var defaultShifts = [
+                ['HC', 'Ca Hành chính', '08:00', '17:00', 60, 15, 'Ca hành chính chuẩn (8h00 - 17h00)'],
+                ['S',  'Ca Sáng',       '06:00', '14:00', 30, 10, 'Ca sáng (6h00 - 14h00)'],
+                ['C',  'Ca Chiều',      '14:00', '22:00', 30, 10, 'Ca chiều (14h00 - 22:00)'],
+                ['D',  'Ca Đêm',        '22:00', '06:00', 45, 10, 'Ca đêm (22h00 - 6h00)']
+            ];
+            defaultShifts.forEach(function(sRow) {
+                shiftSheet.appendRow(sRow);
+            });
+            results.push("Đã khởi tạo 4 ca làm việc mặc định trong bảng Shifts.");
         }
         
         // Kiểm tra xem đã có thư mục lưu trữ PDF chưa
@@ -1271,6 +1290,13 @@ function updateCandidateStatus(id, status, extraData) {
       } catch (e) {
         Logger.log("Failed to send auto offer PDF: " + e.message);
       }
+    }
+    
+    // Tự động tạo Onboarding Checklist khi ứng viên nhận Offer (Passed)
+    try {
+      generateOnboardingChecklist(id, candidateData.senderEmail, extraData ? extraData.startDate : null);
+    } catch(obErr) {
+      Logger.log("Failed to auto generate onboarding checklist: " + obErr.message);
     }
     
   } else if ((status === "Failed" || status === "Unsuitable") && extraData) {
@@ -4473,7 +4499,13 @@ function calculatePayroll(month, year) {
       otSalary = Math.round(rawOtHours * rate * 1.5);
     }
     
-    var gross = basicSalary + allowance + otSalary;
+    var kpiBonus = Number(emp.kpiBonus) || 0;
+    var salesCommission = Number(emp.salesCommission) || 0;
+    var projectAllowance = Number(emp.projectAllowance) || 0;
+    var advanceDeduction = Number(emp.advanceDeduction) || 0;
+    var penaltyDeduction = Number(emp.penaltyDeduction) || 0;
+    
+    var gross = basicSalary + allowance + otSalary + kpiBonus + salesCommission + projectAllowance;
     
     // Social & Unemployment Insurance Base (Capped according to Decree 73/2024/NĐ-CP & 74/2024/NĐ-CP)
     var insurance = calculateMandatoryInsurance(emp.socialInsuranceSalary, basicSalary);
@@ -4482,7 +4514,7 @@ function calculatePayroll(month, year) {
     var dependents = emp.dependents || 0;
     var taxable = gross - insurance - 11000000 - (dependents * 4400000);
     var tax = Math.round(calculatePIT(taxable));
-    var net = gross - insurance - tax;
+    var net = gross - insurance - tax - advanceDeduction - penaltyDeduction;
     
     var key = emp.id + "_" + month + "_" + year;
     var rowIdx = payRowMap[key];
@@ -4492,6 +4524,8 @@ function calculatePayroll(month, year) {
       paySheet.getRange(rowIdx, 6).setValue(insurance);
       paySheet.getRange(rowIdx, 7).setValue(tax);
       paySheet.getRange(rowIdx, 8).setValue(net);
+      // Update extended variable pay columns (Cols 10-14)
+      paySheet.getRange(rowIdx, 10, 1, 5).setValues([[kpiBonus, salesCommission, projectAllowance, advanceDeduction, penaltyDeduction]]);
     } else {
       var payId = "PAY-" + ("0000" + nextNum).slice(-4);
       paySheet.appendRow([
@@ -4503,7 +4537,12 @@ function calculatePayroll(month, year) {
         insurance,
         tax,
         net,
-        ""
+        "",
+        kpiBonus,
+        salesCommission,
+        projectAllowance,
+        advanceDeduction,
+        penaltyDeduction
       ]);
       nextNum++;
     }
@@ -6182,3 +6221,485 @@ function generatePDFFromTemplate(templateId, employeeId) {
     return { success: false, message: error.toString() };
   }
 }
+
+/* ==========================================================================
+   SPRINT 2: ONBOARDING, SHIFTS, LATE DEDUCTION, ESS PORTAL, EMAIL FALLBACK
+   ========================================================================== */
+
+/**
+ * 1. Tự động tạo Checklist Onboarding khi ứng viên chuyển sang trạng thái Passed
+ */
+function generateOnboardingChecklist(candidateId, employeeEmail, offerStartDate) {
+  try {
+    var lock = LockService.getScriptLock();
+    lock.waitLock(5000);
+    
+    var candidate = getCandidateById(candidateId);
+    var candName = candidate ? candidate.senderName : 'Nhân sự mới';
+    var email = employeeEmail || (candidate ? candidate.senderEmail : '');
+    
+    var startDate = offerStartDate ? new Date(offerStartDate) : new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    if (isNaN(startDate.getTime())) startDate = new Date(Date.now() + 7 * 24 * 60 * 60 * 1000);
+    
+    function formatDateOffset(days) {
+      var d = new Date(startDate.getTime() + days * 24 * 60 * 60 * 1000);
+      return Utilities.formatDate(d, Session.getScriptTimeZone(), "yyyy-MM-dd");
+    }
+    
+    var tasks = [
+      { name: "Cấp Email công ty & cấp quyền phần mềm (IT Ticket)", assignedTo: "IT", dueDate: formatDateOffset(-2) },
+      { name: "Chuẩn bị Bàn làm việc, Laptop, Thẻ tên & Thẻ ra vào", assignedTo: "Admin", dueDate: formatDateOffset(-1) },
+      { name: "Phân công Người hướng dẫn (Buddy/Mentor)", assignedTo: "Manager", dueDate: formatDateOffset(-1) },
+      { name: "Gửi Welcome Kit & Sổ tay Nhân viên (Employee Handbook)", assignedTo: "HR", dueDate: formatDateOffset(-3) }
+    ];
+    
+    var obRead = batchReadSheet('OnboardingTasks');
+    var obData = obRead.data;
+    if (obData.length === 0) {
+      obData = [['ID', 'CandidateID', 'EmployeeEmail', 'TaskName', 'AssignedTo', 'DueDate', 'Status', 'Notes', 'CreatedAt']];
+    }
+    
+    var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+    tasks.forEach(function(t, idx) {
+      var taskId = "OB-" + Number(new Date()) + "-" + (idx + 1);
+      obData.push([
+        taskId,
+        candidateId || '',
+        email,
+        t.name,
+        t.assignedTo,
+        t.dueDate,
+        'Pending',
+        'Tự động khởi tạo cho ' + candName,
+        nowStr
+      ]);
+    });
+    
+    batchWriteSheet('OnboardingTasks', obData);
+    return { success: true, count: tasks.length };
+  } catch (e) {
+    Logger.log("Lỗi generateOnboardingChecklist: " + e.message);
+    return { success: false, message: e.message };
+  } finally {
+    try { lock.releaseLock(); } catch(err) {}
+  }
+}
+
+/**
+ * 1. Daily Trigger: Gửi Welcome Email & Sổ tay nhân viên trước ngày nhận việc 3 ngày
+ */
+function sendPreboardingWelcomeEmailTrigger() {
+  try {
+    var employees = getEmployees();
+    var today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    var welcomeList = [];
+    employees.forEach(function(emp) {
+      if (emp.status === 'Thử việc' || emp.status === 'Mới nhận') {
+        var startDateStr = emp.probationStartDate || emp.officialStartDate || emp.startDate;
+        if (!startDateStr) return;
+        var startD = new Date(startDateStr);
+        if (isNaN(startD.getTime())) return;
+        startD.setHours(0, 0, 0, 0);
+        
+        var diffDays = Math.ceil((startD.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+        if (diffDays === 3) {
+          welcomeList.push(emp);
+        }
+      }
+    });
+    
+    if (welcomeList.length === 0) return { success: true, message: "Không có nhân sự mới nào cần gửi Welcome Email hôm nay." };
+    
+    var configs = getConfig();
+    var handbookUrl = configs.employee_handbook_url || "https://drive.google.com";
+    
+    welcomeList.forEach(function(emp) {
+      if (!emp.email) return;
+      var subject = "[RecruitFlow HRM] Chào mừng bạn gia nhập đội ngũ " + (configs.company_name || 'Doanh nghiệp') + "!";
+      var htmlBody = "<div style='font-family: sans-serif; font-size: 13px; color: #1e293b; max-width: 600px; margin: 0 auto; border: 1px solid #e2e8f0; padding: 24px; border-radius: 16px;'>" +
+                     "<h2 style='color: #4f46e5; margin-top: 0;'>WELCOME TO THE TEAM! 🎉</h2>" +
+                     "<p>Kính gửi <b>" + emp.fullName + "</b>,</p>" +
+                     "<p>Chỉ còn 3 ngày nữa là đến ngày bạn chính thức nhận việc tại vị trí <b>" + (emp.position || 'Nhân sự') + "</b> thuộc phòng <b>" + (emp.department || 'Ban Nhân sự') + "</b>.</p>" +
+                     "<p>Để bạn chuẩn bị tốt nhất cho hành trình mới, công ty trân trọng gửi tới bạn <b>Sổ tay Nhân viên (Employee Handbook)</b> chứa đựng các thông tin văn hóa, quy định làm việc và phúc lợi:</p>" +
+                     "<p style='text-align: center; margin: 20px 0;'><a href='" + handbookUrl + "' target='_blank' style='background-color: #4f46e5; color: #ffffff; padding: 12px 24px; text-decoration: none; border-radius: 8px; font-weight: bold;'>Đọc Sổ tay Nhân viên</a></p>" +
+                     "<p>Hẹn gặp lại bạn vào 8h30 sáng ngày đi làm đầu tiên tại văn phòng!</p>" +
+                     "</div>";
+      sendEmailWithFallback(emp.email, subject, htmlBody);
+    });
+    
+    return { success: true, count: welcomeList.length };
+  } catch (e) {
+    Logger.log("Lỗi sendPreboardingWelcomeEmailTrigger: " + e.message);
+    return { success: false, message: e.message };
+  }
+}
+
+/**
+ * 2. Đăng ký Đơn xin đổi ca làm việc (Shift Swap Request)
+ */
+function submitShiftSwapRequest(requesterEmail, targetEmail, swapDate, requesterShift, targetShift) {
+  requireRole(['All']);
+  if (!requesterEmail || !targetEmail || !swapDate) {
+    return { success: false, message: "Vui lòng nhập đầy đủ email đồng nghiệp và ngày đổi ca." };
+  }
+  
+  try {
+    var lock = LockService.getScriptLock();
+    lock.waitLock(5000);
+    
+    var readRes = batchReadSheet('ShiftSwaps');
+    var data = readRes.data;
+    if (data.length === 0) {
+      data = [['ID', 'RequesterEmail', 'TargetEmail', 'SwapDate', 'RequesterShift', 'TargetShift', 'Status', 'ApproverEmail', 'CreatedAt']];
+    }
+    
+    var swapId = "SWAP-" + Number(new Date()) + "-" + Math.floor(Math.random() * 1000);
+    var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+    
+    data.push([
+      swapId,
+      requesterEmail.trim().toLowerCase(),
+      targetEmail.trim().toLowerCase(),
+      swapDate,
+      requesterShift || 'HC',
+      targetShift || 'HC',
+      'Pending',
+      '',
+      nowStr
+    ]);
+    
+    batchWriteSheet('ShiftSwaps', data);
+    
+    var subject = "[RecruitFlow HRM] Yêu cầu Đổi ca làm việc từ " + requesterEmail;
+    var htmlBody = "<p>Bạn có một Đơn xin đổi ca làm việc vào ngày <b>" + swapDate + "</b> từ đồng nghiệp <b>" + requesterEmail + "</b>.</p>" +
+                   "<p>Vui lòng đăng nhập hệ thống để duyệt hoặc từ chối yêu cầu đổi ca này.</p>";
+    sendEmailWithFallback(targetEmail, subject, htmlBody);
+    
+    return { success: true, message: "Đã gửi đơn xin đổi ca thành công!", swapId: swapId };
+  } catch (e) {
+    return { success: false, message: e.message };
+  } finally {
+    try { lock.releaseLock(); } catch(err) {}
+  }
+}
+
+/**
+ * 2. Phê duyệt Đơn xin đổi ca làm việc (Shift Swap Approval)
+ */
+function approveShiftSwap(swapId, status, approverEmail) {
+  requireRole(['Admin', 'HR', 'Manager', 'All']);
+  if (!swapId || !status) return { success: false, message: "Thông tin không hợp lệ." };
+  
+  try {
+    var lock = LockService.getScriptLock();
+    lock.waitLock(5000);
+    
+    var readRes = batchReadSheet('ShiftSwaps');
+    var data = readRes.data;
+    if (data.length <= 1) return { success: false, message: "Không tìm thấy bảng đơn đổi ca." };
+    
+    var targetRowIdx = -1;
+    for (var i = 1; i < data.length; i++) {
+      if (String(data[i][0]).trim() === String(swapId).trim()) {
+        targetRowIdx = i;
+        break;
+      }
+    }
+    
+    if (targetRowIdx === -1) return { success: false, message: "Không tìm thấy mã đơn đổi ca: " + swapId };
+    
+    data[targetRowIdx][6] = status;
+    data[targetRowIdx][7] = approverEmail || Session.getActiveUser().getEmail() || '';
+    
+    batchWriteSheet('ShiftSwaps', data);
+    
+    var reqEmail = data[targetRowIdx][1];
+    var subject = "[RecruitFlow HRM] Kết quả Yêu cầu Đổi ca (" + status + ")";
+    var htmlBody = "<p>Yêu cầu đổi ca mã <b>" + swapId + "</b> của bạn đã được cập nhật trạng thái: <b style='color: " + (status === 'Approved' ? 'green' : 'red') + ";'>" + status + "</b>.</p>";
+    sendEmailWithFallback(reqEmail, subject, htmlBody);
+    
+    return { success: true, message: "Cập nhật đơn đổi ca thành công!" };
+  } catch (e) {
+    return { success: false, message: e.message };
+  } finally {
+    try { lock.releaseLock(); } catch(err) {}
+  }
+}
+
+/**
+ * 3. Tự động đối soát bảng công và tính số phút đi muộn / về sớm cho từng nhân viên theo ca
+ */
+function reconcileAttendanceLateEarly(month, year) {
+  requireRole(['Admin', 'HR']);
+  try {
+    var shiftsRead = batchReadSheet('Shifts');
+    var shiftsData = shiftsRead.data;
+    var shiftGraceMap = {};
+    var shiftStartMap = {};
+    var shiftEndMap   = {};
+    
+    for (var s = 1; s < shiftsData.length; s++) {
+      var code  = String(shiftsData[s][0]).trim();
+      var start = String(shiftsData[s][2]).trim();
+      var end   = String(shiftsData[s][3]).trim();
+      var grace = Number(shiftsData[s][5]) || 15;
+      
+      shiftGraceMap[code] = grace;
+      shiftStartMap[code] = start;
+      shiftEndMap[code]   = end;
+    }
+    
+    var attRead = batchReadSheet('Attendance');
+    var attData = attRead.data;
+    if (attData.length <= 1) return { success: true, summary: {} };
+    
+    var attHeaders = attRead.headers;
+    var empIdCol    = attHeaders.indexOf('EmployeeID');
+    var dateCol     = attHeaders.indexOf('Date');
+    var checkInCol  = attHeaders.indexOf('CheckIn');
+    var checkOutCol = attHeaders.indexOf('CheckOut');
+    
+    var empDeductionMap = {};
+    
+    for (var i = 1; i < attData.length; i++) {
+      var row = attData[i];
+      var empId = empIdCol !== -1 ? String(row[empIdCol]).trim() : '';
+      var dVal  = dateCol !== -1 ? row[dateCol] : '';
+      if (!empId || !dVal) continue;
+      
+      var dStr = dVal instanceof Date ? Utilities.formatDate(dVal, Session.getScriptTimeZone(), "yyyy-MM-dd") : String(dVal).trim();
+      var dParts = dStr.split("-");
+      if (dParts.length !== 3) continue;
+      
+      if (parseInt(dParts[0], 10) === parseInt(year, 10) && parseInt(dParts[1], 10) === parseInt(month, 10)) {
+        var checkInStr  = checkInCol !== -1 ? String(row[checkInCol]).trim() : '';
+        var shiftStart = shiftStartMap['HC'] || "08:00";
+        var grace = shiftGraceMap['HC'] || 15;
+        
+        var lateMinutes = 0;
+        if (checkInStr && checkInStr.indexOf(":") !== -1) {
+          var inParts = checkInStr.split(":");
+          var startParts = shiftStart.split(":");
+          var inMins = parseInt(inParts[0], 10) * 60 + parseInt(inParts[1], 10);
+          var startMins = parseInt(startParts[0], 10) * 60 + parseInt(startParts[1], 10);
+          var diff = inMins - startMins;
+          if (diff > grace) {
+            lateMinutes = diff - grace;
+          }
+        }
+        
+        if (!empDeductionMap[empId]) {
+          empDeductionMap[empId] = { totalLateMinutes: 0, lateCount: 0 };
+        }
+        if (lateMinutes > 0) {
+          empDeductionMap[empId].totalLateMinutes += lateMinutes;
+          empDeductionMap[empId].lateCount += 1;
+        }
+      }
+    }
+    
+    return { success: true, summary: empDeductionMap };
+  } catch (e) {
+    return { success: false, message: e.message };
+  }
+}
+
+/**
+ * 5. ESS Portal: Lấy thông tin cá nhân, lịch sử lương, quỹ phép và lịch sử chấm công của nhân viên
+ */
+function getEssProfile(clientEmail) {
+  var activeEmail = clientEmail || Session.getActiveUser().getEmail();
+  if (!activeEmail) throw new Error("Vui lòng đăng nhập để sử dụng Cổng ESS.");
+  activeEmail = activeEmail.toLowerCase().trim();
+  
+  var employees = getEmployees();
+  var emp = employees.find(e => (e.email || '').toLowerCase().trim() === activeEmail);
+  if (!emp) throw new Error("Không tìm thấy thông tin hồ sơ nhân sự của tài khoản: " + activeEmail);
+  
+  var empDetailRes = getEmployeeDetail(emp.id);
+  var empCombined = empDetailRes.employee || emp;
+  
+  return {
+    success: true,
+    profile: empCombined,
+    payrolls: empDetailRes.payrolls || [],
+    attendance: empDetailRes.attendance || [],
+    leaveBalance: {
+      total: empCombined.totalLeaveDays || 12,
+      used: empCombined.usedLeaveDays || 0,
+      remaining: (empCombined.totalLeaveDays || 12) - (empCombined.usedLeaveDays || 0)
+    }
+  };
+}
+
+/**
+ * 5. ESS Portal: Nhân viên gửi yêu cầu chỉnh sửa thông tin cá nhân (SĐT, Địa chỉ, STK ngân hàng...)
+ */
+function updateEssProfile(clientEmail, updatedFields) {
+  var activeEmail = clientEmail || Session.getActiveUser().getEmail();
+  if (!activeEmail) throw new Error("Vui lòng đăng nhập.");
+  activeEmail = activeEmail.toLowerCase().trim();
+  
+  try {
+    var lock = LockService.getScriptLock();
+    lock.waitLock(5000);
+    
+    var reqRead = batchReadSheet('EssUpdateRequests');
+    var data = reqRead.data;
+    if (data.length === 0) {
+      data = [['ID', 'EmployeeEmail', 'FieldName', 'OldValue', 'NewValue', 'Status', 'ApproverEmail', 'CreatedAt']];
+    }
+    
+    var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
+    var reqCount = 0;
+    
+    for (var field in updatedFields) {
+      var reqId = "ESS-" + Number(new Date()) + "-" + Math.floor(Math.random() * 1000);
+      data.push([
+        reqId,
+        activeEmail,
+        field,
+        '',
+        String(updatedFields[field]),
+        'Pending',
+        '',
+        nowStr
+      ]);
+      reqCount++;
+    }
+    
+    batchWriteSheet('EssUpdateRequests', data);
+    return { success: true, message: "Đã gửi " + reqCount + " yêu cầu cập nhật thông tin tới phòng HR duyệt." };
+  } catch (e) {
+    return { success: false, message: e.message };
+  } finally {
+    try { lock.releaseLock(); } catch(err) {}
+  }
+}
+
+/**
+ * 5. ESS Portal: Xuất Giấy Xác nhận Công tác / Xác nhận Thu nhập dạng PDF
+ */
+function generateEmploymentVerificationPDF(clientEmail, verificationType) {
+  var activeEmail = clientEmail || Session.getActiveUser().getEmail();
+  if (!activeEmail) throw new Error("Vui lòng đăng nhập.");
+  activeEmail = activeEmail.toLowerCase().trim();
+  
+  var employees = getEmployees();
+  var emp = employees.find(e => (e.email || '').toLowerCase().trim() === activeEmail);
+  if (!emp) throw new Error("Không tìm thấy thông tin nhân viên.");
+  
+  var typeTitle = verificationType === 'Income' ? 'GIẤY XÁC NHẬN THU NHẬP' : 'GIẤY XÁC NHẬN CÔNG TÁC';
+  var configs = getConfig() || {};
+  var companyName = configs.company_name || 'CÔNG TY CỔ PHẦN CÔNG NGHỆ RECRUITFLOW';
+  
+  var htmlContent = "<div style='font-family: Arial, sans-serif; font-size: 13px; line-height: 1.6; padding: 30px;'>" +
+                    "<h3 style='text-align: center; margin-bottom: 5px;'>" + companyName.toUpperCase() + "</h3>" +
+                    "<h2 style='text-align: center; color: #1e1b4b; margin-top: 15px;'>" + typeTitle + "</h2>" +
+                    "<p>Kính gửi: Các cơ quan hữu quan / Ngân hàng / Đơn vị tiếp nhận</p>" +
+                    "<p>Công ty chúng tôi trân trọng xác nhận thông tin nhân sự sau đây:</p>" +
+                    "<ul>" +
+                    "<li><b>Họ và tên nhân viên:</b> " + emp.fullName + "</li>" +
+                    "<li><b>Mã nhân sự:</b> " + emp.id + "</li>" +
+                    "<li><b>Địa chỉ Email:</b> " + emp.email + "</li>" +
+                    "<li><b>Phòng ban công tác:</b> " + (emp.department || 'Chưa phân phòng') + "</li>" +
+                    "<li><b>Chức danh chuyên môn:</b> " + (emp.position || 'Nhân sự chính thức') + "</li>" +
+                    "<li><b>Ngày bắt đầu làm việc:</b> " + (emp.officialStartDate || emp.startDate || '—') + "</li>" +
+                    "<li><b>Mức lương cơ bản hàng tháng:</b> " + (emp.basicSalary ? emp.basicSalary.toLocaleString() + ' VNĐ' : '—') + "</li>" +
+                    "</ul>" +
+                    "<p>Giấy xác nhận này được cấp theo yêu cầu của cá nhân ông/bà " + emp.fullName + " để sử dụng làm thủ tục hành chính hợp pháp.</p>" +
+                    "<br><br>" +
+                    "<table style='width: 100%; text-align: center;'>" +
+                    "<tr><td></td><td><b>ĐẠI DIỆN BAN GIÁM ĐỐC / HR DIRECTOR</b><br><i>(Ký tên & đóng dấu)</i></td></tr>" +
+                    "</table>" +
+                    "</div>";
+  
+  var htmlBlob = Utilities.newBlob(htmlContent, 'text/html', 'verification.html');
+  var pdfBlob = htmlBlob.getAs('application/pdf');
+  var base64Data = Utilities.base64Encode(pdfBlob.getBytes());
+  
+  return {
+    success: true,
+    base64: base64Data,
+    fileName: typeTitle.replace(/\s+/g, '_') + "_" + emp.fullName + ".pdf"
+  };
+}
+
+/**
+ * 6. Gửi Email thông minh với cơ chế Fallback tự động:
+ * 1. Kiểm tra Quota còn lại của Gmail (MailApp.getRemainingDailyQuota()).
+ * 2. Nếu quota > 10: Sử dụng MailApp.sendEmail().
+ * 3. Nếu quota <= 10: Tự động chuyển đổi sang SendGrid HTTP API via UrlFetchApp.
+ */
+function sendEmailWithFallback(toEmail, subject, htmlBody, attachments) {
+  if (!toEmail) return { success: false, message: "Email nhận không được để trống." };
+  
+  var remainingQuota = MailApp.getRemainingDailyQuota();
+  
+  // Dùng MailApp nếu còn Quota an toàn (> 10 mail)
+  if (remainingQuota > 10) {
+    try {
+      MailApp.sendEmail({
+        to: toEmail,
+        subject: subject,
+        htmlBody: htmlBody
+      });
+      return { success: true, provider: 'GmailMailApp' };
+    } catch (e) {
+      Logger.log("MailApp thất bại, chuyển sang SendGrid Fallback: " + e.message);
+    }
+  }
+  
+  // Chuyển sang SendGrid HTTP API khi Gmail chạm hạn ngạch Quota
+  var configs = getConfig();
+  var sendgridApiKey = configs.sendgrid_api_key || configs.SENDGRID_API_KEY;
+  var senderEmail = configs.sender_email || "no-reply@company.com";
+  
+  if (!sendgridApiKey) {
+    try {
+      MailApp.sendEmail({ to: toEmail, subject: subject, htmlBody: htmlBody });
+      return { success: true, provider: 'GmailMailAppFallback' };
+    } catch (err) {
+      throw new Error("Tài khoản đã hết Hạn ngạch Gmail Quota và chưa cấu hình SendGrid API Key trong Config.");
+    }
+  }
+  
+  try {
+    var payload = {
+      personalizations: [{
+        to: [{ email: toEmail }]
+      }],
+      from: { email: senderEmail, name: configs.company_name || "RecruitFlow HRM" },
+      subject: subject,
+      content: [{
+        type: "text/html",
+        value: htmlBody
+      }]
+    };
+    
+    var options = {
+      method: "post",
+      contentType: "application/json",
+      headers: {
+        Authorization: "Bearer " + sendgridApiKey
+      },
+      payload: JSON.stringify(payload),
+      muteHttpExceptions: true
+    };
+    
+    var response = UrlFetchApp.fetch("https://api.sendgrid.com/v3/mail/send", options);
+    var code = response.getResponseCode();
+    
+    if (code === 200 || code === 202) {
+      return { success: true, provider: 'SendGridAPI' };
+    } else {
+      throw new Error("SendGrid API phản hồi mã lỗi: " + code + " - " + response.getContentText());
+    }
+  } catch (err) {
+    Logger.log("Lỗi SendGrid API: " + err.message);
+    throw new Error("Không thể gửi email: " + err.message);
+  }
+}
+
