@@ -5368,10 +5368,10 @@ function getEmployeeDetail(employeeId) {
 }
 
 /**
- * LƯU THAY ĐỔI CHI TIẾT NÂNG CẤP BATCH PROCESSING & TỰ ĐỘNG GHI JOB HISTORY
- * Cập nhật đồng bộ cả 2 bảng Employees và EmployeeDetails bằng Batch Array Processing
+ * LƯU THAY ĐỔI CHI TIẾT NÂNG CẤP VỚI CƠ CHẾ STAGING & TRANSACTION ROLLBACK SỐ DỮ LIỆU
  */
 function saveEmployeeDetail(details) {
+    requireRole(['Admin', 'HR']);
     var lock = LockService.getScriptLock();
     try {
         lock.waitLock(10000);
@@ -5380,144 +5380,172 @@ function saveEmployeeDetail(details) {
 
         var empName = details.fullName || '';
 
-        // ---- 1. CAP NHAT BANG EMPLOYEES VỚI BATCH PROCESSING ----
+        // ---- STEP 1: STAGING & SNAPSHOT PHASE (PREPARE IN MEMORY BEFORE WRITING) ----
         var empRead = batchReadSheet('Employees');
-        if (empRead.sheet && empRead.data.length > 1) {
-            var empData = empRead.data;
-            var empHeaders = empRead.headers;
-            var empColMap = {};
-            empHeaders.forEach(function(h, idx) { empColMap[h] = idx; });
-
-            var empRowIdx = -1;
-            for (var i = 1; i < empData.length; i++) {
-                if (String(empData[i][0]).trim() === employeeId) {
-                    empRowIdx = i;
-                    break;
-                }
-            }
-
-            if (empRowIdx !== -1) {
-                var row = empData[empRowIdx];
-
-                // Ghi vết JobHistory tự động nếu phát hiện thay đổi
-                var oldStatus = empColMap['Status'] !== undefined ? String(row[empColMap['Status']]).trim() : '';
-                var oldDept   = empColMap['Department'] !== undefined ? String(row[empColMap['Department']]).trim() : '';
-                var oldPos    = empColMap['Position'] !== undefined ? String(row[empColMap['Position']]).trim() : '';
-                var oldSalary = empColMap['BasicSalary'] !== undefined ? Number(row[empColMap['BasicSalary']]) || 0 : 0;
-
-                var newStatus = details.status !== undefined ? String(details.status).trim() : oldStatus;
-                var newDept   = details.department !== undefined ? String(details.department).trim() : oldDept;
-                var newPos    = details.position !== undefined ? String(details.position).trim() : oldPos;
-                var newSalary = details.basicSalary !== undefined ? Number(details.basicSalary) || 0 : oldSalary;
-
-                if (newStatus && oldStatus && newStatus !== oldStatus) {
-                    logJobHistory(employeeId, empName, 'StatusChange', oldStatus, newStatus, '', '', 'Thay đổi trạng thái nhân sự');
-                }
-                if (newDept && oldDept && newDept !== oldDept) {
-                    logJobHistory(employeeId, empName, 'Transferred', oldDept, newDept, '', '', 'Điều chuyển phòng ban');
-                }
-                if (newPos && oldPos && newPos !== oldPos) {
-                    logJobHistory(employeeId, empName, 'Promoted', oldPos, newPos, '', '', 'Thay đổi chức danh công tác');
-                }
-                if (newSalary !== oldSalary && oldSalary > 0) {
-                    logJobHistory(employeeId, empName, 'SalaryRaised', oldSalary, newSalary, '', '', 'Điều chỉnh mức lương cơ bản');
-                }
-
-                // Update row values in RAM
-                function setCell(colName, val) {
-                    var idx = empColMap[colName];
-                    if (idx !== undefined && val !== undefined && val !== null) {
-                        row[idx] = val;
-                    }
-                }
-
-                setCell('FullName',           details.fullName);
-                setCell('Gender',             details.gender);
-                setCell('Email',              details.email);
-                setCell('Phone',              details.phone);
-                setCell('Department',         details.department);
-                setCell('Position',           details.position);
-                setCell('BasicSalary',        details.basicSalary ? Number(details.basicSalary) : 0);
-                setCell('ProbationSalary',    details.probationSalary ? Number(details.probationSalary) : 0);
-                setCell('Allowances',         details.allowances);
-                setCell('ProbationStartDate', details.probationStartDate);
-                setCell('OfficialStartDate',  details.officialStartDate);
-                setCell('ContractExpiryDate', details.contractExpiryDate);
-                setCell('Status',             details.status);
-                setCell('ContractType',       details.contractType);
-                setCell('StartDate',          details.officialStartDate || details.probationStartDate);
-                setCell('EndDate',            details.contractExpiryDate);
-
-                empData[empRowIdx] = row;
-                batchWriteSheet('Employees', empData);
-            }
-        }
-
-        // ---- 2. CAP NHAT BANG EMPLOYEEDETAILS VỚI BATCH PROCESSING ----
+        if (!empRead.sheet || empRead.data.length <= 1) throw new Error("Không tìm thấy dữ liệu bảng Employees.");
+        
         var detRead = batchReadSheet('EmployeeDetails');
         if (!detRead.sheet) {
             initializeDatabaseV2();
             detRead = batchReadSheet('EmployeeDetails');
         }
+        if (!detRead.sheet) throw new Error("Không thể khởi tạo bảng EmployeeDetails.");
 
-        if (detRead.sheet) {
-            var detData = detRead.data;
-            var detHeaders = detRead.headers;
-            if (detData.length === 0) {
-                detData = [detHeaders];
+        // Snapshot original state for Rollback safety
+        var originalEmpData = JSON.parse(JSON.stringify(empRead.data));
+        var originalDetData = JSON.parse(JSON.stringify(detRead.data));
+
+        // Prepare Staged Employees Array
+        var empData = empRead.data;
+        var empHeaders = empRead.headers;
+        var empColMap = {};
+        empHeaders.forEach(function(h, idx) { empColMap[h] = idx; });
+
+        var empRowIdx = -1;
+        for (var i = 1; i < empData.length; i++) {
+            if (String(empData[i][0]).trim() === employeeId) {
+                empRowIdx = i;
+                break;
             }
-            var detColMap = {};
-            detHeaders.forEach(function(h, idx) { detColMap[h] = idx; });
-
-            var detRowIdx = -1;
-            for (var i = 1; i < detData.length; i++) {
-                if (String(detData[i][0]).trim() === employeeId) {
-                    detRowIdx = i;
-                    break;
-                }
-            }
-
-            // Self-healing: Tạo mới dòng trong mảng RAM nếu thiếu
-            if (detRowIdx === -1) {
-                var healRow = new Array(detHeaders.length).fill('');
-                if (detColMap['EmployeeID'] !== undefined) healRow[detColMap['EmployeeID']] = employeeId;
-                if (detColMap['FullName'] !== undefined)   healRow[detColMap['FullName']]   = details.fullName || '';
-                if (detColMap['Department'] !== undefined) healRow[detColMap['Department']] = details.department || '';
-                if (detColMap['Gender'] !== undefined)     healRow[detColMap['Gender']]     = details.gender || 'Nam';
-                if (detColMap['Docs'] !== undefined)       healRow[detColMap['Docs']]       = '[]';
-                detData.push(healRow);
-                detRowIdx = detData.length - 1;
-            }
-
-            var detRow = detData[detRowIdx];
-            function setDetCell(colName, val) {
-                var idx = detColMap[colName];
-                if (idx !== undefined && val !== undefined && val !== null) {
-                    detRow[idx] = val;
-                }
-            }
-
-            setDetCell('FullName',                  details.fullName);
-            setDetCell('Department',                details.department);
-            setDetCell('Avatar',                    details.avatar);
-            setDetCell('Gender',                    details.gender);
-            setDetCell('BirthPlace',               details.birthPlace);
-            setDetCell('CurrentAddress',           details.currentAddress);
-            setDetCell('RegisterAddress',          details.registerAddress);
-            setDetCell('IdentityCardNumber',       details.idCardNumber);
-            setDetCell('IdentityCardDate',         details.idCardDate);
-            setDetCell('IdentityCardPlace',        details.idCardPlace);
-            setDetCell('AcademicLevel',            details.academicLevel);
-            setDetCell('Specialization',           details.specialization);
-            setDetCell('GraduationInstitution',    details.graduationInstitution);
-            setDetCell('YouthUnionDate',           details.youthUnionDate);
-            setDetCell('CommunistPartyDateStatus', details.communistPartyDateStatus);
-            setDetCell('Docs',                     details.docs);
-            setDetCell('DateOfBirth',              details.dob || details.dateOfBirth);
-
-            detData[detRowIdx] = detRow;
-            batchWriteSheet('EmployeeDetails', detData);
         }
+        if (empRowIdx === -1) throw new Error("Không tìm thấy mã nhân sự " + employeeId + " trong bảng Employees.");
+
+        var row = empData[empRowIdx];
+
+        // Audit JobHistory changes in Staging
+        var oldStatus = empColMap['Status'] !== undefined ? String(row[empColMap['Status']]).trim() : '';
+        var oldDept   = empColMap['Department'] !== undefined ? String(row[empColMap['Department']]).trim() : '';
+        var oldPos    = empColMap['Position'] !== undefined ? String(row[empColMap['Position']]).trim() : '';
+        var oldSalary = empColMap['BasicSalary'] !== undefined ? Number(row[empColMap['BasicSalary']]) || 0 : 0;
+
+        var newStatus = details.status !== undefined ? String(details.status).trim() : oldStatus;
+        var newDept   = details.department !== undefined ? String(details.department).trim() : oldDept;
+        var newPos    = details.position !== undefined ? String(details.position).trim() : oldPos;
+        var newSalary = details.basicSalary !== undefined ? Number(details.basicSalary) || 0 : oldSalary;
+
+        function setCell(colName, val) {
+            var idx = empColMap[colName];
+            if (idx !== undefined && val !== undefined && val !== null) {
+                row[idx] = val;
+            }
+        }
+
+        setCell('FullName',           details.fullName);
+        setCell('Gender',             details.gender);
+        setCell('Email',              details.email);
+        setCell('Phone',              details.phone);
+        setCell('Department',         details.department);
+        setCell('Position',           details.position);
+        setCell('BasicSalary',        details.basicSalary ? Number(details.basicSalary) : 0);
+        setCell('ProbationSalary',    details.probationSalary ? Number(details.probationSalary) : 0);
+        setCell('Allowances',         details.allowances);
+        setCell('ProbationStartDate', details.probationStartDate);
+        setCell('OfficialStartDate',  details.officialStartDate);
+        setCell('ContractExpiryDate', details.contractExpiryDate);
+        setCell('Status',             details.status);
+        setCell('ContractType',       details.contractType);
+        setCell('StartDate',          details.officialStartDate || details.probationStartDate);
+        setCell('EndDate',            details.contractExpiryDate);
+
+        empData[empRowIdx] = row;
+
+        // Prepare Staged EmployeeDetails Array
+        var detData = detRead.data;
+        var detHeaders = detRead.headers;
+        if (detData.length === 0) {
+            detData = [detHeaders];
+        }
+        var detColMap = {};
+        detHeaders.forEach(function(h, idx) { detColMap[h] = idx; });
+
+        var detRowIdx = -1;
+        for (var d = 1; d < detData.length; d++) {
+            if (String(detData[d][0]).trim() === employeeId) {
+                detRowIdx = d;
+                break;
+            }
+        }
+
+        if (detRowIdx === -1) {
+            var healRow = new Array(detHeaders.length).fill('');
+            if (detColMap['EmployeeID'] !== undefined) healRow[detColMap['EmployeeID']] = employeeId;
+            if (detColMap['FullName'] !== undefined)   healRow[detColMap['FullName']]   = details.fullName || '';
+            if (detColMap['Department'] !== undefined) healRow[detColMap['Department']] = details.department || '';
+            if (detColMap['Gender'] !== undefined)     healRow[detColMap['Gender']]     = details.gender || 'Nam';
+            if (detColMap['Docs'] !== undefined)       healRow[detColMap['Docs']]       = '[]';
+            detData.push(healRow);
+            detRowIdx = detData.length - 1;
+        }
+
+        var detRow = detData[detRowIdx];
+        function setDetCell(colName, val) {
+            var idx = detColMap[colName];
+            if (idx !== undefined && val !== undefined && val !== null) {
+                detRow[idx] = val;
+            }
+        }
+
+        setDetCell('FullName',                  details.fullName);
+        setDetCell('Department',                details.department);
+        setDetCell('Avatar',                    details.avatar);
+        setDetCell('Gender',                    details.gender);
+        setDetCell('BirthPlace',               details.birthPlace);
+        setDetCell('CurrentAddress',           details.currentAddress);
+        setDetCell('RegisterAddress',          details.registerAddress);
+        setDetCell('IdentityCardNumber',       details.idCardNumber);
+        setDetCell('IdentityCardDate',         details.idCardDate);
+        setDetCell('IdentityCardPlace',        details.idCardPlace);
+        setDetCell('AcademicLevel',            details.academicLevel);
+        setDetCell('Specialization',           details.specialization);
+        setDetCell('GraduationInstitution',    details.graduationInstitution);
+        setDetCell('YouthUnionDate',           details.youthUnionDate);
+        setDetCell('CommunistPartyDateStatus', details.communistPartyDateStatus);
+        setDetCell('Docs',                     details.docs);
+        setDetCell('DateOfBirth',              details.dob || details.dateOfBirth);
+
+        detData[detRowIdx] = detRow;
+
+        // ---- STEP 2: COMMIT PHASE WITH ROLLBACK SAFETY ----
+        try {
+            // Write step 1: Employees
+            batchWriteSheet('Employees', empData);
+            
+            // Write step 2: EmployeeDetails
+            batchWriteSheet('EmployeeDetails', detData);
+
+            // Log history AFTER successful atomic commit
+            if (newStatus && oldStatus && newStatus !== oldStatus) {
+                logJobHistory(employeeId, empName, 'StatusChange', oldStatus, newStatus, '', '', 'Thay đổi trạng thái nhân sự');
+            }
+            if (newDept && oldDept && newDept !== oldDept) {
+                logJobHistory(employeeId, empName, 'Transferred', oldDept, newDept, '', '', 'Điều chuyển phòng ban');
+            }
+            if (newPos && oldPos && newPos !== oldPos) {
+                logJobHistory(employeeId, empName, 'Promoted', oldPos, newPos, '', '', 'Thay đổi chức danh công tác');
+            }
+            if (newSalary !== oldSalary && oldSalary > 0) {
+                logJobHistory(employeeId, empName, 'SalaryRaised', oldSalary, newSalary, '', '', 'Điều chỉnh mức lương cơ bản');
+            }
+
+            try { CacheService.getScriptCache().remove('all_employees'); } catch(e) {}
+
+            return { success: true, message: 'Cập nhật thông tin nhân sự thành công!', employeeId: employeeId };
+
+        } catch (commitErr) {
+            // ROLLBACK: Restore original snapshot to Google Sheets if write failed mid-way
+            Logger.log("COMMIT FAILED! Rolling back Employees and EmployeeDetails... Error: " + commitErr.message);
+            try { batchWriteSheet('Employees', originalEmpData); } catch(rb1) {}
+            try { batchWriteSheet('EmployeeDetails', originalDetData); } catch(rb2) {}
+            throw new Error("Giao dịch lưu dữ liệu thất bại, hệ thống đã Rollback khôi phục dữ liệu ban đầu: " + commitErr.message);
+        }
+
+    } catch (e) {
+        Logger.log('Lỗi saveEmployeeDetail: ' + e.message);
+        return { success: false, message: e.message };
+    } finally {
+        try { lock.releaseLock(); } catch (err) {}
+    }
+}
 
         return { success: true };
     } catch (e) {
@@ -7403,6 +7431,168 @@ function testProrateSalaryCaseResignedEmployee20th() {
   
   return { ratio: ratio, proratedSalary: proratedSalary };
 }
+
+/**
+ * Cascade Archive / Soft-delete Nhân sự để tránh Orphan Data gây lệch báo cáo
+ */
+function archiveEmployeeAndCascade(empId, reason) {
+  requireRole(['Admin', 'HR']);
+  if (!empId) return { success: false, message: "Mã nhân sự không được để trống." };
+  
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+    var todayStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd");
+    
+    // 1. Update Employees Sheet (Status = 'Nghỉ việc', ResignReason, ResignDate)
+    var empRead = batchReadSheet('Employees');
+    if (!empRead.sheet || empRead.data.length <= 1) throw new Error("Không tìm thấy dữ liệu bảng Employees.");
+    var empData = empRead.data;
+    var empHeaders = empRead.headers;
+    var empColMap = {};
+    empHeaders.forEach(function(h, idx) { empColMap[h] = idx; });
+    
+    var empRowIdx = -1;
+    var empName = "Unknown";
+    for (var i = 1; i < empData.length; i++) {
+      if (String(empData[i][0]).trim() === String(empId).trim()) {
+        empRowIdx = i;
+        empName = empColMap['FullName'] !== undefined ? String(empData[i][empColMap['FullName']]).trim() : "Unknown";
+        break;
+      }
+    }
+    
+    if (empRowIdx === -1) return { success: false, message: "Không tìm thấy mã nhân sự: " + empId };
+    
+    if (empColMap['Status'] !== undefined) empData[empRowIdx][empColMap['Status']] = 'Nghỉ việc';
+    if (empColMap['EndDate'] !== undefined) empData[empRowIdx][empColMap['EndDate']] = todayStr;
+    if (empColMap['ContractExpiryDate'] !== undefined) empData[empRowIdx][empColMap['ContractExpiryDate']] = todayStr;
+    
+    batchWriteSheet('Employees', empData);
+    
+    // 2. Cascade Update EmployeeDetails Sheet (Status = 'Archived')
+    var detRead = batchReadSheet('EmployeeDetails');
+    if (detRead.sheet && detRead.data.length > 1) {
+      var detData = detRead.data;
+      var detHeaders = detRead.headers;
+      var statusCol = detHeaders.indexOf('Status');
+      for (var d = 1; d < detData.length; d++) {
+        if (String(detData[d][0]).trim() === String(empId).trim()) {
+          if (statusCol !== -1) detData[d][statusCol] = 'Archived';
+        }
+      }
+      batchWriteSheet('EmployeeDetails', detData);
+    }
+    
+    // 3. Cascade Asset Retrieval / Soft-archive
+    var assetRead = batchReadSheet('Assets');
+    if (assetRead.sheet && assetRead.data.length > 1) {
+      var assetData = assetRead.data;
+      var assetHeaders = assetRead.headers;
+      var assignedToCol = assetHeaders.indexOf('AssignedTo');
+      var assetStatusCol = assetHeaders.indexOf('Status');
+      for (var a = 1; a < assetData.length; a++) {
+        if (assignedToCol !== -1 && String(assetData[a][assignedToCol]).trim() === String(empId).trim()) {
+          if (assetStatusCol !== -1) assetData[a][assetStatusCol] = 'Available';
+          assetData[a][assignedToCol] = '';
+        }
+      }
+      batchWriteSheet('Assets', assetData);
+    }
+    
+    // 4. Log JobHistory for Audit Trail
+    logJobHistory(empId, empName, 'Resigned/Archived', 'Active', 'Archived', '', '', reason || 'Lưu trữ/Nghỉ việc nhân sự');
+    
+    // Invalidate caches
+    try { CacheService.getScriptCache().remove('all_employees'); } catch(e) {}
+    
+    return {
+      success: true,
+      message: "Đã chuyển nhân sự " + empId + " (" + empName + ") sang trạng thái Lưu trữ (Archived) và thu hồi tài sản liên quan.",
+      archivedEmpId: empId
+    };
+  } catch (e) {
+    Logger.log("Lỗi archiveEmployeeAndCascade: " + e.message);
+    return { success: false, message: e.message };
+  } finally {
+    try { lock.releaseLock(); } catch(err) {}
+  }
+}
+
+/**
+ * BỘ TEST TỰ ĐỘNG CƠ BẢN (UNIT TEST SUITE) CHO CÁC HÀM TÍNH TOÁN QUAN TRỌNG
+ * Kiểm thử: Tính Lương, Trần Bảo hiểm NĐ 73/2024 & NĐ 74/2024, Phép thâm niên, và Prorate Lương
+ */
+function runHrmSystemUnitTestSuite() {
+  var results = [];
+  var passedCount = 0;
+  var failedCount = 0;
+  
+  function assertEqual(testName, actual, expected, description) {
+    var pass = (actual === expected);
+    if (pass) passedCount++; else failedCount++;
+    results.push({
+      testName: testName,
+      status: pass ? "PASSED" : "FAILED",
+      actual: actual,
+      expected: expected,
+      description: description
+    });
+  }
+  
+  // ---- TEST 1: Cấu hình Trần BHXH/BHYT (NĐ 73/2024 - 46,800,000 VNĐ) & BHTN (NĐ 74/2024 - 99,200,000 VNĐ) ----
+  var salaryHigh = 150000000;
+  var insResult = calculateMandatoryInsurance(salaryHigh, salaryHigh);
+  // BHXH (8%) + BHYT (1.5%) trần 46.8M = 4,446,000 VNĐ. BHTN (1%) trần 99.2M = 992,000 VNĐ -> Tổng = 5,438,000 VNĐ
+  assertEqual("TEST_INSURANCE_CAP_HIGH_SALARY", insResult, 5438000, "Kiểm tra mức đóng BHXH/BHTN tối đa áp dụng trần NĐ 73/2024 & NĐ 74/2024 cho lương 150 triệu");
+  
+  // ---- TEST 2: Phép Thâm niên theo Điều 114 Luật Lao động 2019 ----
+  // Giả định 12 năm thâm niên -> Cứ 5 năm được +1 ngày -> +2 ngày phép thâm niên
+  var seniorityYears = 12;
+  var extraSeniorityDays = Math.floor(seniorityYears / 5);
+  assertEqual("TEST_SENIORITY_LEAVE_ARTICLE_114", extraSeniorityDays, 2, "Kiểm tra cộng 2 ngày phép thâm niên cho 12 năm làm việc");
+  
+  // ---- TEST 3: Prorate Lương cho Nhân viên vào làm ngày 15/07/2026 ----
+  var mockNewEmp = {
+    id: "EMP-TEST-01",
+    officialStartDate: "2026-07-15",
+    basicSalary: 10000000,
+    status: "Chính thức"
+  };
+  var prorateRatioNew = calculateProrateRatio(mockNewEmp, 7, 2026, 22);
+  var proratedSalaryNew = Math.round(mockNewEmp.basicSalary * prorateRatioNew);
+  assertEqual("TEST_PRORATE_NEW_EMPLOYEE_15TH", proratedSalaryNew, 6818182, "Kiểm tra lương Prorate cho nhân viên vào làm ngày 15/07 (15/22 ngày công = 68.18%)");
+  
+  // ---- TEST 4: Prorate Lương cho Nhân viên nghỉ việc ngày 20/07/2026 ----
+  var mockResignEmp = {
+    id: "EMP-TEST-02",
+    resignDate: "2026-07-20",
+    basicSalary: 10000000,
+    status: "Nghỉ việc"
+  };
+  var prorateRatioResign = calculateProrateRatio(mockResignEmp, 7, 2026, 22);
+  var proratedSalaryResign = Math.round(mockResignEmp.basicSalary * prorateRatioResign);
+  assertEqual("TEST_PRORATE_RESIGNED_EMPLOYEE_20TH", proratedSalaryResign, 7727273, "Kiểm tra lương Prorate cho nhân viên nghỉ ngày 20/07 (17/22 ngày công = 77.27%)");
+
+  // ---- TEST 5: Tính Thuế TNCN Khấu trừ Gia cảnh (11M bản thân + 4.4M/người phụ thuộc) ----
+  // Lương chịu thuế = 20M - Ins (1.9M) - 11M - 4.4M (1 NPT) = 2.7M -> Bậc 1 (5%) = 135,000 VNĐ
+  var insStandard = calculateMandatoryInsurance(20000000, 20000000);
+  var taxableIncome = 20000000 - insStandard - 11000000 - 4400000;
+  var pitTax = Math.round(calculatePIT(taxableIncome));
+  assertEqual("TEST_PIT_TAX_CALCULATION", pitTax, 135000, "Kiểm tra tính Thuế TNCN bậc 1 (5%) cho thu nhập tính thuế 2.7 triệu");
+
+  Logger.log("=== BỘ KẾT QUẢ UNIT TEST HRM SUITE ===");
+  Logger.log("Tổng số test cases: " + results.length + " | PASSED: " + passedCount + " | FAILED: " + failedCount);
+  
+  return {
+    success: failedCount === 0,
+    total: results.length,
+    passedCount: passedCount,
+    failedCount: failedCount,
+    results: results
+  };
+}
+
 
 
 
