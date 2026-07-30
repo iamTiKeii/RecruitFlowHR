@@ -2641,15 +2641,16 @@ function saveInterviewPlanning(candidateId, interviewerEmail, interviewDate, mee
 /**
  * Filter candidates assigned to the current Interviewer email
  */
-function getInterviewerCandidates() {
+function getInterviewerCandidates(clientEmail) {
   var activeEmail = getActiveUserEmail();
-  if (!activeEmail) return [];
+  var email = (activeEmail && activeEmail.length > 0) ? activeEmail : String(clientEmail || "").toLowerCase().trim();
+  if (!email) return [];
   
   var list = getCandidates();
   var filtered = [];
   for (var i = 0; i < list.length; i++) {
     var candInterviewer = list[i].assignedInterviewer ? list[i].assignedInterviewer.toLowerCase().trim() : "";
-    if (candInterviewer === activeEmail) {
+    if (candInterviewer === email || list[i].interviewerEmail === email) {
       filtered.push(list[i]);
     }
   }
@@ -2707,18 +2708,19 @@ function getCandidateCVData(candidateId) {
 /**
  * Update candidate interview assessment results by Interviewer
  */
-function updateInterviewResult(candidateId, result, offerData) {
+function updateInterviewResult(candidateId, result, offerData, clientEmail, scorecardData) {
   var activeEmail = getActiveUserEmail();
-  if (!activeEmail) throw new Error("Yêu cầu đăng nhập.");
+  var email = (activeEmail && activeEmail.length > 0) ? activeEmail : String(clientEmail || "").toLowerCase().trim();
+  if (!email) throw new Error("Yêu cầu đăng nhập để thực hiện đánh giá.");
   
   // Verify that the candidate is assigned to this interviewer (unless Admin/HR)
-  var role = getUserRoleByEmail(activeEmail);
+  var role = getUserRoleByEmail(email);
   var candidate = getCandidateById(candidateId);
-  if (!candidate) throw new Error("Candidate not found.");
+  if (!candidate) throw new Error("Không tìm thấy ứng viên.");
   
   if (role !== 'Admin' && role !== 'HR') {
     var assigned = candidate.assignedInterviewer ? candidate.assignedInterviewer.toLowerCase().trim() : "";
-    if (assigned !== activeEmail) {
+    if (assigned && assigned !== email) {
       throw new Error("Bạn không có quyền đánh giá ứng viên này.");
     }
   }
@@ -2736,7 +2738,7 @@ function updateInterviewResult(candidateId, result, offerData) {
     }
   }
   
-  if (rowIndex === -1) throw new Error("Candidate ID " + candidateId + " not found.");
+  if (rowIndex === -1) throw new Error("Mã ứng viên " + candidateId + " không tồn tại.");
   
   // Save evaluation history as JSON
   var historyStr = sheet.getRange(rowIndex, 30).getValue();
@@ -2751,11 +2753,12 @@ function updateInterviewResult(candidateId, result, offerData) {
   
   var nowStr = formatDateString(new Date());
   var evalItem = {
-    interviewer: activeEmail,
+    interviewer: email,
     status: result, // 'Passed' or 'Failed'
     salary: offerData ? offerData.gross : "",
     startDate: offerData ? offerData.startDate : "",
-    notes: offerData ? offerData.notes : "",
+    notes: offerData ? (offerData.notes || "") : (scorecardData ? (scorecardData.notes || "") : ""),
+    scorecard: scorecardData || null,
     timestamp: nowStr
   };
   history.push(evalItem);
