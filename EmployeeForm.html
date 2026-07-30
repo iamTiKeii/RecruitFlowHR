@@ -160,6 +160,54 @@
           <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Ngày hết hạn hợp đồng</label>
           <input type="date" x-model="form.contractExpiryDate" class="w-full px-4 py-3 text-xs rounded-xl glass-input font-mono">
         </div>
+
+        <!-- Section Divider: Bank Account Details -->
+        <div class="col-span-1 md:col-span-2 border-t border-slate-800 pt-4 mt-2">
+          <h4 class="font-bold text-indigo-400 uppercase tracking-wider text-[11px] mb-3 flex items-center gap-1.5">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"></path></svg>
+            <span>Thông tin Tài khoản Ngân hàng (Chuyển tiền lương)</span>
+          </h4>
+          <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <!-- Bank Name Select -->
+            <div>
+              <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Ngân hàng</label>
+              <select x-model="form.bankName" class="w-full px-4 py-3 text-xs rounded-xl glass-input bg-slate-900 font-semibold">
+                <option value="">-- Chọn ngân hàng --</option>
+                <option value="Vietcombank">Vietcombank (VCB)</option>
+                <option value="Techcombank">Techcombank (TCB)</option>
+                <option value="VPBank">VPBank (VPB)</option>
+                <option value="BIDV">BIDV</option>
+                <option value="MBBank">MBBank (MB)</option>
+                <option value="VietinBank">VietinBank (CTG)</option>
+                <option value="Agribank">Agribank (VBR)</option>
+                <option value="ACB">ACB</option>
+                <option value="Sacombank">Sacombank (STB)</option>
+                <option value="TPBank">TPBank (TPB)</option>
+                <option value="MSB">MSB</option>
+                <option value="HDBank">HDBank</option>
+                <option value="Khác">Ngân hàng khác...</option>
+              </select>
+            </div>
+
+            <!-- Bank Account Number -->
+            <div>
+              <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Số tài khoản ngân hàng</label>
+              <input type="text" x-model="form.bankAccountNumber" placeholder="0123456789" class="w-full px-4 py-3 text-xs rounded-xl glass-input font-mono font-bold text-indigo-300">
+            </div>
+
+            <!-- Bank Account Holder -->
+            <div>
+              <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Tên chủ tài khoản (Viết hoa không dấu)</label>
+              <input type="text" x-model="form.bankAccountHolder" placeholder="NGUYEN VAN A" class="w-full px-4 py-3 text-xs rounded-xl glass-input font-bold uppercase">
+            </div>
+
+            <!-- Bank Branch -->
+            <div>
+              <label class="block font-bold text-slate-300 mb-1.5 uppercase tracking-wider text-[11px]">Chi nhánh ngân hàng</label>
+              <input type="text" x-model="form.bankBranch" placeholder="Ví dụ: Chi nhánh TP.HCM" class="w-full px-4 py-3 text-xs rounded-xl glass-input">
+            </div>
+          </div>
+        </div>
       </div>
 
     </div>
@@ -259,6 +307,10 @@
             officialStartDate: emp.officialStartDate || '',
             contractExpiryDate: emp.contractExpiryDate || '',
             status: emp.status || 'Đang làm',
+            bankName: emp.bankName || '',
+            bankAccountNumber: emp.bankAccountNumber || '',
+            bankAccountHolder: emp.bankAccountHolder || emp.fullName || '',
+            bankBranch: emp.bankBranch || '',
             candidateId: ''
           };
         } else {
@@ -281,6 +333,10 @@
             officialStartDate: '',
             contractExpiryDate: '',
             status: 'Đang làm',
+            bankName: '',
+            bankAccountNumber: '',
+            bankAccountHolder: '',
+            bankBranch: '',
             candidateId: ''
           };
         }

@@ -710,7 +710,8 @@ function initSystem() {
                 'ID', 'FullName', 'Gender', 'Email', 'Phone', 'Department', 'Position',
                 'BasicSalary', 'ProbationSalary', 'Allowances', 'ProbationStartDate',
                 'OfficialStartDate', 'ContractExpiryDate', 'Status',
-                'SocialInsuranceSalary', 'Dependents', 'TotalLeaveDays', 'UsedLeaveDays'
+                'SocialInsuranceSalary', 'Dependents', 'TotalLeaveDays', 'UsedLeaveDays',
+                'BankName', 'BankAccountNumber', 'BankAccountHolder', 'BankBranch'
             ],
             'FamilyRelations': ['ID', 'EmployeeID', 'RelationType', 'FullName', 'BirthYear', 'Job', 'WorkPlace'],
             'EducationHistory': ['ID', 'EmployeeID', 'FromDate', 'ToDate', 'SchoolName', 'FieldOfStudy', 'ModeOfStudy', 'Degree'],
@@ -3040,6 +3041,10 @@ function getEmployees() {
       officialStartDate: oStartStr,
       contractExpiryDate: expiryStr,
       status: String(getVal('Status', 'Đang làm')).trim(),
+      bankName: String(getVal('BankName', '')).trim(),
+      bankAccountNumber: String(getVal('BankAccountNumber', '')).trim(),
+      bankAccountHolder: String(getVal('BankAccountHolder', fullName)).trim(),
+      bankBranch: String(getVal('BankBranch', '')).trim(),
       
       // Aliases for legacy compatibility
       startDate: oStartStr || pStartStr,
@@ -3124,6 +3129,10 @@ function addEmployee(emp, clientEmail) {
         setVal('StartDate', emp.officialStartDate || emp.probationStartDate || "");
         setVal('EndDate', emp.contractExpiryDate || "");
         setVal('Allowance', emp.allowance || 0);
+        setVal('BankName', emp.bankName || "");
+        setVal('BankAccountNumber', emp.bankAccountNumber || "");
+        setVal('BankAccountHolder', emp.bankAccountHolder || emp.fullName || "");
+        setVal('BankBranch', emp.bankBranch || "");
 
         sheet.appendRow(newRow);
 
@@ -5361,6 +5370,10 @@ function getEmployeeDetail(employeeId) {
             contractExpiryDate: formatDate(getEmpVal('ContractExpiryDate') || getEmpVal('EndDate')),
             status: String(getEmpVal('Status')).trim() || "Đang làm",
             contractType: String(getEmpVal('ContractType')).trim(),
+            bankName: String(getEmpVal('BankName') || getDetVal('BankName')).trim(),
+            bankAccountNumber: String(getEmpVal('BankAccountNumber') || getDetVal('BankAccountNumber')).trim(),
+            bankAccountHolder: String(getEmpVal('BankAccountHolder') || getDetVal('BankAccountHolder') || getEmpVal('FullName')).trim(),
+            bankBranch: String(getEmpVal('BankBranch') || getDetVal('BankBranch')).trim(),
 
             avatar: String(getDetVal('Avatar')).trim(),
             birthPlace: String(getDetVal('BirthPlace')).trim(),
@@ -5646,6 +5659,10 @@ function saveEmployeeDetail(details) {
         setCell('ProbationSalary',    details.probationSalary ? Number(details.probationSalary) : 0);
         setCell('Allowances',         details.allowances);
         setCell('ProbationStartDate', details.probationStartDate);
+        setCell('BankName',           details.bankName);
+        setCell('BankAccountNumber',  details.bankAccountNumber);
+        setCell('BankAccountHolder',  details.bankAccountHolder);
+        setCell('BankBranch',         details.bankBranch);
         setCell('OfficialStartDate',  details.officialStartDate);
         setCell('ContractExpiryDate', details.contractExpiryDate);
         setCell('Status',             details.status);
