@@ -6999,13 +6999,13 @@ function sendKudos(receiverEmail, badge, message) {
     var id = "KUDOS-" + Number(new Date());
     var nowStr = Utilities.formatDate(new Date(), Session.getScriptTimeZone(), "yyyy-MM-dd HH:mm:ss");
     
-    data.push([id, senderEmail, receiverEmail, badge || '⭐ Ngôi sao đồng đội', message, nowStr]);
+    data.push([id, senderEmail, receiverEmail, badge || 'Ngôi sao đồng đội', message, nowStr]);
     batchWriteSheet('Kudos', data);
     
     var subject = "[RecruitFlow HRM] Bạn vừa nhận được 1 KUDOS vinh danh từ " + senderEmail + "!";
     var htmlBody = "<div style='font-family: sans-serif; padding: 20px; border: 1px solid #e2e8f0; border-radius: 12px; max-width: 500px;'>" +
-                   "<h2 style='color: #4f46e5;'>BẠN THẬT TUYỆT VỜI! 🏆</h2>" +
-                   "<p>Đồng nghiệp <b>" + senderEmail + "</b> vừa tặng bạn danh hiệu: <b style='color: #d97706;'>" + (badge || '⭐ Ngôi sao đồng đội') + "</b></p>" +
+                   "<h2 style='color: #4f46e5;'>BẠN THẬT TUYỆT VỜI!</h2>" +
+                   "<p>Đồng nghiệp <b>" + senderEmail + "</b> vừa tặng bạn danh hiệu: <b style='color: #d97706;'>" + (badge || 'Ngôi sao đồng đội') + "</b></p>" +
                    "<blockquote style='background: #f8fafc; padding: 12px; border-left: 4px solid #4f46e5;'>" + message + "</blockquote>" +
                    "</div>";
     sendEmailWithFallback(receiverEmail, subject, htmlBody);
@@ -7038,7 +7038,7 @@ function sendBirthdayAndAnniversaryGreetingsTrigger() {
         if (!isNaN(dobD.getTime())) {
           var dobMonthDay = Utilities.formatDate(dobD, Session.getScriptTimeZone(), "MM-dd");
           if (dobMonthDay === currentMonthDay) {
-            var bSubject = "🎂 CHÚC MỪNG SINH NHẬT " + emp.fullName.toUpperCase() + "!";
+            var bSubject = "CHÚC MỪNG SINH NHẬT " + emp.fullName.toUpperCase() + "!";
             var bBody = "<p>Chúc mừng sinh nhật <b>" + emp.fullName + "</b>! Chúc bạn một tuổi mới tràn đầy sức khỏe, hạnh phúc và thành công cùng công ty!</p>";
             sendEmailWithFallback(emp.email, bSubject, bBody);
             bdayCount++;
@@ -7053,7 +7053,7 @@ function sendBirthdayAndAnniversaryGreetingsTrigger() {
           var startMonthDay = Utilities.formatDate(startD, Session.getScriptTimeZone(), "MM-dd");
           var yearsDiff = today.getFullYear() - startD.getFullYear();
           if (startMonthDay === currentMonthDay && yearsDiff >= 1) {
-            var aSubject = "🎉 CHÚC MỪNG KỶ NIỆM " + yearsDiff + " NĂM ĐỒNG HÀNH CÙNG CÔNG TY!";
+            var aSubject = "CHÚC MỪNG KỶ NIỆM " + yearsDiff + " NĂM ĐỒNG HÀNH CÙNG CÔNG TY!";
             var aBody = "<p>Cảm ơn <b>" + emp.fullName + "</b> đã gắn bó và cống hiến suốt <b>" + yearsDiff + " năm</b> qua!</p>";
             sendEmailWithFallback(emp.email, aSubject, aBody);
             annivCount++;

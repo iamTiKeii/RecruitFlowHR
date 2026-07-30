@@ -187,7 +187,7 @@
     background: transparent !important;
   }
 
-  /* --- Complete Light Mode Parity --- */
+  /* --- Complete Light Mode Parity & Element Synchronization --- */
   html:not(.dark) {
     background-color: #f8fafc !important; /* slate-50 */
     color: #0f172a !important; /* slate-900 */
@@ -199,23 +199,43 @@
   }
 
   html:not(.dark) .glass-card {
-    background: rgba(255, 255, 255, 0.9) !important;
+    background: rgba(255, 255, 255, 0.95) !important;
     border: 1px solid rgba(226, 232, 240, 0.9) !important; /* slate-200 */
-    box-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.05), 0 2px 4px -1px rgba(0, 0, 0, 0.03) !important;
+    box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.05), 0 4px 6px -2px rgba(0, 0, 0, 0.02) !important;
+    color: #0f172a !important;
   }
 
-  html:not(.dark) .glass-sidebar {
-    background: rgba(255, 255, 255, 0.95) !important;
+  html:not(.dark) .glass-sidebar,
+  html:not(.dark) nav#sidebarPanel {
+    background: rgba(255, 255, 255, 0.96) !important;
     border-right: 1px solid rgba(226, 232, 240, 0.9) !important;
+    border-bottom: 1px solid rgba(226, 232, 240, 0.9) !important;
+    color: #0f172a !important;
   }
 
-  html:not(.dark) .glass-input {
-    background: rgba(255, 255, 255, 0.95) !important;
+  html:not(.dark) .glass-input,
+  html:not(.dark) input[type="text"],
+  html:not(.dark) input[type="number"],
+  html:not(.dark) input[type="email"],
+  html:not(.dark) input[type="date"],
+  html:not(.dark) input[type="datetime-local"],
+  html:not(.dark) input[type="password"],
+  html:not(.dark) select,
+  html:not(.dark) textarea {
+    background: #ffffff !important;
     border: 1px solid rgba(203, 213, 225, 0.9) !important; /* slate-300 */
     color: #0f172a !important;
   }
 
-  html:not(.dark) .glass-input:focus {
+  html:not(.dark) select option {
+    background: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  html:not(.dark) .glass-input:focus,
+  html:not(.dark) input:focus,
+  html:not(.dark) select:focus,
+  html:not(.dark) textarea:focus {
     background: #ffffff !important;
     border-color: #4f46e5 !important;
     box-shadow: 0 0 0 3px rgba(79, 70, 229, 0.15) !important;
@@ -240,6 +260,71 @@
   html:not(.dark) .nav-active-tab {
     color: #4f46e5 !important;
     border-bottom: 2px solid #4f46e5 !important;
+  }
+
+  /* Global Light Mode Element Text & Background Synchronization */
+  html:not(.dark) h1,
+  html:not(.dark) h2,
+  html:not(.dark) h3,
+  html:not(.dark) h4,
+  html:not(.dark) h5,
+  html:not(.dark) h6 {
+    color: #0f172a !important;
+  }
+
+  html:not(.dark) .text-white {
+    color: #0f172a !important;
+  }
+
+  html:not(.dark) .text-slate-100,
+  html:not(.dark) .text-slate-200,
+  html:not(.dark) .text-slate-300 {
+    color: #1e293b !important;
+  }
+
+  html:not(.dark) .text-slate-400 {
+    color: #64748b !important;
+  }
+
+  html:not(.dark) .bg-slate-900,
+  html:not(.dark) .bg-slate-950,
+  html:not(.dark) .bg-slate-900\/90,
+  html:not(.dark) .bg-slate-900\/95,
+  html:not(.dark) .bg-slate-900\/80,
+  html:not(.dark) .bg-slate-900\/50 {
+    background-color: #ffffff !important;
+    color: #0f172a !important;
+  }
+
+  html:not(.dark) .bg-slate-800,
+  html:not(.dark) .bg-slate-800\/80,
+  html:not(.dark) .bg-slate-800\/50 {
+    background-color: #f1f5f9 !important;
+    color: #1e293b !important;
+  }
+
+  html:not(.dark) .border-slate-800,
+  html:not(.dark) .border-slate-800\/80,
+  html:not(.dark) .border-slate-800\/50,
+  html:not(.dark) .border-slate-700,
+  html:not(.dark) .border-slate-700\/80 {
+    border-color: #e2e8f0 !important;
+  }
+
+  /* Preserve White Text Color for Primary Buttons & Accent Badges in Light Mode */
+  html:not(.dark) .bg-indigo-600,
+  html:not(.dark) .bg-indigo-600 *,
+  html:not(.dark) .bg-indigo-500,
+  html:not(.dark) .bg-indigo-500 *,
+  html:not(.dark) .bg-emerald-600,
+  html:not(.dark) .bg-emerald-600 *,
+  html:not(.dark) .bg-rose-600,
+  html:not(.dark) .bg-rose-600 *,
+  html:not(.dark) .bg-amber-600,
+  html:not(.dark) .bg-amber-600 *,
+  html:not(.dark) button.bg-indigo-600,
+  html:not(.dark) button.bg-indigo-600 span {
+    color: #ffffff !important;
   }
 
   /* Light Mode Badge Overrides for Maximum Readability */
@@ -321,5 +406,11 @@
     background: #0f172a !important;
     color: #f8fafc !important;
     border: 1px solid rgba(255, 255, 255, 0.1) !important;
+  }
+
+  html:not(.dark) .swal2-popup {
+    background: #ffffff !important;
+    color: #0f172a !important;
+    border: 1px solid rgba(226, 232, 240, 1) !important;
   }
 </style>
