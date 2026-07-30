@@ -1955,6 +1955,236 @@ function getHRReportData(reportCode, month, year, department, clientEmail) {
 }
 
 /**
+ * GENERATE A4 PDF FOR ANY OF THE 12 HR REPORTS (HTML to PDF Engine)
+ */
+function exportReportPDF(reportCode, month, year, department, clientEmail) {
+  requireRole(['Admin', 'HR'], clientEmail);
+  
+  // 1. Fetch Report Data
+  var reportData = getHRReportData(reportCode, month, year, department, clientEmail);
+  var rows = reportData.rows || [];
+  
+  // 2. Define Columns Schema for PDF
+  var columnSchemas = {
+    'BC-REC-01': [
+      { key: 'id', label: 'Mã UV' },
+      { key: 'senderName', label: 'Họ và Tên' },
+      { key: 'senderEmail', label: 'Email' },
+      { key: 'phone', label: 'SĐT' },
+      { key: 'subject', label: 'Vị trí Ứng tuyển' },
+      { key: 'receivedDate', label: 'Ngày nhận' },
+      { key: 'status', label: 'Trạng thái' },
+      { key: 'interviewer', label: 'Người phỏng vấn' }
+    ],
+    'BC-REC-02': [
+      { key: 'id', label: 'Mã UV' },
+      { key: 'senderName', label: 'Tên Ứng viên' },
+      { key: 'subject', label: 'Vị trí' },
+      { key: 'interviewer', label: 'Người PV' },
+      { key: 'techScore', label: 'Chuyên môn' },
+      { key: 'commScore', label: 'Giao tiếp' },
+      { key: 'cultureScore', label: 'Văn hóa' },
+      { key: 'problemScore', label: 'Giải quyết VĐ' },
+      { key: 'weightedAvg', label: 'ĐTB Trọng số' },
+      { key: 'status', label: 'Kết quả' }
+    ],
+    'BC-REC-03': [
+      { key: 'date', label: 'Ngày' },
+      { key: 'total', label: 'Tổng CV Nhận' },
+      { key: 'suitable', label: 'Phù hợp' },
+      { key: 'interview', label: 'Hẹn PV' },
+      { key: 'offer', label: 'Offer' },
+      { key: 'failed', label: 'Không đạt' }
+    ],
+    'BC-HR-01': [
+      { key: 'id', label: 'Mã NV' },
+      { key: 'fullName', label: 'Họ và Tên' },
+      { key: 'gender', label: 'Giới tính' },
+      { key: 'department', label: 'Phòng ban' },
+      { key: 'position', label: 'Chức vụ' },
+      { key: 'contractType', label: 'Loại HĐ' },
+      { key: 'officialStartDate', label: 'Ngày chính thức' },
+      { key: 'bankName', label: 'Ngân hàng' },
+      { key: 'bankAccountNumber', label: 'Số TK' }
+    ],
+    'BC-HR-02': [
+      { key: 'id', label: 'Mã NV' },
+      { key: 'fullName', label: 'Họ tên' },
+      { key: 'department', label: 'Phòng ban' },
+      { key: 'position', label: 'Chức vụ' },
+      { key: 'probationStartDate', label: 'Thử việc từ' },
+      { key: 'officialStartDate', label: 'Chính thức từ' },
+      { key: 'contractExpiryDate', label: 'Hết hạn HĐ' },
+      { key: 'daysRemaining', label: 'Ngày còn lại' },
+      { key: 'alertStatus', label: 'Cảnh báo' }
+    ],
+    'BC-HR-03': [
+      { key: 'id', label: 'Mã log' },
+      { key: 'employeeId', label: 'Mã NV' },
+      { key: 'employeeName', label: 'Họ tên' },
+      { key: 'changeType', label: 'Loại thay đổi' },
+      { key: 'oldValue', label: 'Giá trị cũ' },
+      { key: 'newValue', label: 'Giá trị mới' },
+      { key: 'effectiveDate', label: 'Ngày hiệu lực' }
+    ],
+    'BC-ATT-01': [
+      { key: 'employeeId', label: 'Mã NV' },
+      { key: 'employeeName', label: 'Họ tên' },
+      { key: 'date', label: 'Ngày' },
+      { key: 'checkIn', label: 'Check-In' },
+      { key: 'checkOut', label: 'Check-Out' },
+      { key: 'ipAddress', label: 'Địa chỉ IP' },
+      { key: 'otHours', label: 'Giờ OT' },
+      { key: 'status', label: 'Trạng thái' }
+    ],
+    'BC-ATT-02': [
+      { key: 'employeeId', label: 'Mã NV' },
+      { key: 'fullName', label: 'Họ tên' },
+      { key: 'department', label: 'Phòng ban' },
+      { key: 'totalLeaveDays', label: 'Tổng Phép năm' },
+      { key: 'usedLeaveDays', label: 'Đã nghỉ' },
+      { key: 'remainingLeaveDays', label: 'Phép còn lại' }
+    ],
+    'BC-ATT-03': [
+      { key: 'id', label: 'Mã Đơn' },
+      { key: 'employeeId', label: 'Mã NV' },
+      { key: 'date', label: 'Ngày OT' },
+      { key: 'hours', label: 'Giờ OT' },
+      { key: 'otType', label: 'Loại OT' },
+      { key: 'multiplier', label: 'Hệ số' },
+      { key: 'convertedHours', label: 'Giờ quy đổi' },
+      { key: 'status', label: 'Trạng thái' }
+    ],
+    'BC-PAY-01': [
+      { key: 'id', label: 'Mã Phiếu' },
+      { key: 'monthYear', label: 'Tháng/Năm' },
+      { key: 'employeeId', label: 'Mã NV' },
+      { key: 'employeeName', label: 'Họ tên' },
+      { key: 'totalSalary', label: 'Lương Gross' },
+      { key: 'insurance', label: 'BHXH' },
+      { key: 'tax', label: 'Thuế TNCN' },
+      { key: 'netSalary', label: 'Thực Lĩnh Net' }
+    ],
+    'BC-PAY-02': [
+      { key: 'employeeId', label: 'Mã NV' },
+      { key: 'employeeName', label: 'Họ tên' },
+      { key: 'bankName', label: 'Ngân hàng' },
+      { key: 'bankAccountNumber', label: 'Số TK' },
+      { key: 'netSalary', label: 'Số tiền chuyển' }
+    ],
+    'BC-PAY-03': [
+      { key: 'id', label: 'Mã Log' },
+      { key: 'employeeId', label: 'Mã NV' },
+      { key: 'newSalary', label: 'Mức lương mới' },
+      { key: 'changeDate', label: 'Ngày tăng lương' },
+      { key: 'notes', label: 'Ghi chú' }
+    ]
+  };
+
+  var columns = columnSchemas[reportCode] || [];
+
+  // 3. Build HTML Table Rows
+  var tableHeadersHtml = columns.map(function(c) {
+    return '<th style="background-color: #1e1b4b; color: #ffffff; padding: 8px 6px; text-align: left; font-size: 11px; border: 1px solid #cbd5e1; text-transform: uppercase;">' + c.label + '</th>';
+  }).join('');
+
+  var tableBodyHtml = '';
+  if (rows.length === 0) {
+    tableBodyHtml = '<tr><td colspan="' + columns.length + '" style="text-align: center; padding: 20px; font-style: italic; color: #64748b;">Không có dữ liệu báo cáo.</td></tr>';
+  } else {
+    tableBodyHtml = rows.map(function(r, idx) {
+      var bg = (idx % 2 === 0) ? '#ffffff' : '#f8fafc';
+      var tds = columns.map(function(c) {
+        var val = r[c.key];
+        if (val === undefined || val === null || val === '') val = '-';
+        if ((c.key.indexOf('Salary') !== -1 || c.key === 'totalSalary' || c.key === 'insurance' || c.key === 'tax' || c.key === 'netSalary') && typeof val === 'number') {
+          val = val.toLocaleString('vi-VN') + ' đ';
+        }
+        return '<td style="padding: 7px 6px; border: 1px solid #e2e8f0; font-size: 11px; color: #1e293b;">' + val + '</td>';
+      }).join('');
+      return '<tr style="background-color: ' + bg + ';">' + tds + '</tr>';
+    }).join('');
+  }
+
+  var timeZone = Session.getScriptTimeZone();
+  var todayStr = Utilities.formatDate(new Date(), timeZone, "dd/MM/yyyy HH:mm");
+
+  // 4. Construct Complete A4 Print Document HTML
+  var htmlContent = '<!DOCTYPE html><html><head><meta charset="utf-8">' +
+    '<style>' +
+    '@page { size: A4 landscape; margin: 10mm; }' +
+    'body { font-family: "Arial", sans-serif; color: #0f172a; padding: 15px; margin: 0; font-size: 12px; }' +
+    '.header-box { display: flex; justify-content: space-between; align-items: center; border-bottom: 2px solid #334155; padding-bottom: 12px; margin-bottom: 15px; }' +
+    '.company-title { font-size: 14px; font-weight: bold; color: #1e1b4b; text-transform: uppercase; }' +
+    '.report-title { font-size: 18px; font-weight: bold; color: #4338ca; text-align: center; text-transform: uppercase; margin: 15px 0 5px 0; }' +
+    '.sub-meta { text-align: center; font-size: 11px; color: #64748b; margin-bottom: 15px; font-style: italic; }' +
+    '.kpi-box { background-color: #f1f5f9; border: 1px solid #cbd5e1; padding: 10px 15px; border-radius: 6px; margin-bottom: 15px; display: flex; justify-content: space-between; font-weight: bold; font-size: 12px; }' +
+    'table { width: 100%; border-collapse: collapse; margin-bottom: 25px; }' +
+    '.footer-sig { display: flex; justify-content: space-between; text-align: center; margin-top: 30px; }' +
+    '</style></head><body>' +
+    
+    '<div class="header-box">' +
+    '<div><div class="company-title">CÔNG TY RECRUITFLOW HRM</div><div style="font-size: 10px; color: #64748b;">Hệ thống Quản trị Nhân sự & Tuyển dụng Thông minh</div></div>' +
+    '<div style="text-align: right; font-size: 10px; color: #64748b;">Mã báo cáo: <b>' + reportCode + '</b><br>Ngày xuất: ' + todayStr + '</div>' +
+    '</div>' +
+
+    '<div class="report-title">' + reportData.title + '</div>' +
+    '<div class="sub-meta">Kỳ báo cáo: Tháng ' + month + '/' + year + ' | Phòng ban: ' + (department === 'All' ? 'Tất cả phòng ban' : department) + '</div>' +
+
+    '<div class="kpi-box">' +
+    '<span>TỔNG SỐ BẢN GHI: <span style="color: #4338ca;">' + rows.length + '</span></span>' +
+    '<span>NGƯỜI XUẤT: <span style="color: #0f172a;">' + (clientEmail || 'Admin') + '</span></span>' +
+    '</div>' +
+
+    '<table>' +
+    '<thead><tr>' + tableHeadersHtml + '</tr></thead>' +
+    '<tbody>' + tableBodyHtml + '</tbody>' +
+    '</table>' +
+
+    '<div class="footer-sig">' +
+    '<div><b>NGƯỜI LẬP BÁO CÁO</b><br><i style="font-size: 10px;">(Ký và ghi rõ họ tên)</i><br><br><br><br><b>' + (clientEmail || 'HR Specialist') + '</b></div>' +
+    '<div><b>TRƯỞNG PHÒNG NHÂN SỰ</b><br><i style="font-size: 10px;">(Ký và ghi rõ họ tên)</i><br><br><br><br><b>Xác nhận</b></div>' +
+    '<div><b>BAN GIÁM ĐỐC PHÊ DUYỆT</b><br><i style="font-size: 10px;">(Ký và đóng dấu)</i><br><br><br><br><b>Đã duyệt</b></div>' +
+    '</div>' +
+
+    '</body></html>';
+
+  // 5. Convert HTML to PDF Blob & Save to Drive
+  var htmlBlob = Utilities.newBlob(htmlContent, 'text/html', 'report_' + reportCode + '.html');
+  var pdfBlob = htmlBlob.getAs('application/pdf');
+
+  var configs = getConfig() || {};
+  var folderId = configs['PRINT_PDF_FOLDER_ID'] || configs['print_pdf_folder_id'] || "";
+  var targetFolder = null;
+  if (folderId) {
+    try { targetFolder = DriveApp.getFolderById(folderId); } catch (e) {}
+  }
+  if (!targetFolder) {
+    var folderName = "HRM Generated Documents";
+    var folders = DriveApp.getFoldersByName(folderName);
+    if (folders.hasNext()) targetFolder = folders.next();
+    else {
+      targetFolder = DriveApp.createFolder(folderName);
+      targetFolder.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    }
+  }
+
+  var fileName = reportCode + "_T" + month + "_" + year + ".pdf";
+  pdfBlob.setName(fileName);
+  var file = targetFolder.createFile(pdfBlob);
+  file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+
+  var base64 = Utilities.base64Encode(pdfBlob.getBytes());
+  return {
+    success: true,
+    fileId: file.getId(),
+    fileName: fileName,
+    url: file.getUrl(),
+    base64: base64
+  };
+}
+
+/**
  * Metadata retrieval helper
  */
 function getSystemMeta() {

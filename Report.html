@@ -162,6 +162,10 @@
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"></path></svg>
           <span>Xuất CSV</span>
         </button>
+        <button @click="printReportPDF" class="px-4 py-2.5 bg-rose-600 hover:bg-rose-500 text-white rounded-xl text-xs font-bold shadow-md transition-all cursor-pointer flex items-center gap-1.5" title="In báo cáo A4 dạng PDF">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6.72 13.82l-.24 2.08A1.85 1.85 0 008.32 18h7.36a1.85 1.85 0 001.84-2.1l-.24-2.08m-10.48 0H17.2m-10.48 0a1.85 1.85 0 01-1.84-2l.24-2.08A1.85 1.85 0 017 8h10a1.85 1.85 0 011.84 2l.24 2.08a1.85 1.85 0 01-1.84 2M9 5h6m-7 3v4m10-4v4" /></svg>
+          <span>In PDF</span>
+        </button>
       </div>
     </div>
 
@@ -603,6 +607,53 @@
         document.body.removeChild(link);
 
         Swal.fire('Thành công', `Đã xuất tệp CSV cho báo cáo ${this.selectedReportCode}!`, 'success');
+      },
+
+      printReportPDF() {
+        showLoading(`Đang kết xuất tệp PDF cho báo cáo ${this.selectedReportCode}...`);
+        const userStr = localStorage.getItem('recruitment_user');
+        const user = userStr ? JSON.parse(userStr) : null;
+        const clientEmail = user ? (user.email || user.username) : '';
+
+        runBackend('exportReportPDF', this.selectedReportCode, this.filterMonth, this.filterYear, this.filterDept, clientEmail)
+          .then(res => {
+            hideLoading();
+            if (res.success && res.base64) {
+              const byteCharacters = atob(res.base64);
+              const byteNumbers = new Array(byteCharacters.length);
+              for (let i = 0; i < byteCharacters.length; i++) {
+                byteNumbers[i] = byteCharacters.charCodeAt(i);
+              }
+              const byteArray = new Uint8Array(byteNumbers);
+              const blob = new Blob([byteArray], { type: 'application/pdf' });
+              const url = URL.createObjectURL(blob);
+              
+              window.open(url, '_blank');
+              Swal.fire({
+                title: 'Kết xuất PDF thành công!',
+                text: `Tệp PDF cho báo cáo ${this.selectedReportCode} đã sẵn sàng.`,
+                icon: 'success',
+                showCancelButton: true,
+                confirmButtonText: 'Tải file PDF',
+                cancelButtonText: 'Đóng'
+              }).then((result) => {
+                if (result.isConfirmed) {
+                  const link = document.createElement("a");
+                  link.href = url;
+                  link.download = res.fileName || `${this.selectedReportCode}.pdf`;
+                  document.body.appendChild(link);
+                  link.click();
+                  document.body.removeChild(link);
+                }
+              });
+            } else {
+              Swal.fire('Lỗi kết xuất', res.message || 'Không thể tạo tệp PDF', 'error');
+            }
+          })
+          .catch(err => {
+            hideLoading();
+            Swal.fire('Lỗi hệ thống', err.message, 'error');
+          });
       }
     }));
   });
