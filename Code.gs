@@ -1674,6 +1674,287 @@ function getReports() {
 }
 
 /**
+ * COMPREHENSIVE HR REPORTS ENGINE (Supports 12 Specialized HR Reports)
+ */
+function getHRReportData(reportCode, month, year, department, clientEmail) {
+  requireRole(['Admin', 'HR'], clientEmail);
+  reportCode = String(reportCode || 'BC-REC-01').toUpperCase().trim();
+  month = parseInt(month || (new Date().getMonth() + 1), 10);
+  year = parseInt(year || new Date().getFullYear(), 10);
+  department = String(department || 'All').trim();
+
+  var ss = getSpreadsheet();
+  var timeZone = Session.getScriptTimeZone();
+
+  function formatDateVal(d) {
+    if (!d) return "";
+    if (d instanceof Date) return Utilities.formatDate(d, timeZone, "yyyy-MM-dd");
+    var str = String(d).trim();
+    if (str.length >= 10) return str.substring(0, 10);
+    return str;
+  }
+
+  // 1. RECRUITMENT REPORTS
+  if (reportCode === 'BC-REC-01') {
+    var candidates = getCandidates() || [];
+    var rows = [];
+    candidates.forEach(function(c) {
+      if (department !== 'All' && c.subject && c.subject.indexOf(department) === -1) return;
+      rows.push({
+        id: c.id,
+        senderName: c.senderName,
+        senderEmail: c.senderEmail,
+        phone: c.phoneNumber || '',
+        subject: c.subject,
+        receivedDate: c.receivedDate,
+        status: c.status,
+        interviewer: c.assignedInterviewer || '',
+        cvLink: c.cvLink || '',
+        meetLink: c.meetLink || '',
+        rejectionReason: c.rejectionReason || ''
+      });
+    });
+    return { reportCode: reportCode, title: 'Báo cáo Phễu Tuyển dụng & Lịch sử Hồ sơ', count: rows.length, rows: rows };
+
+  } else if (reportCode === 'BC-REC-02') {
+    var candidates = getCandidates() || [];
+    var rows = [];
+    candidates.forEach(function(c) {
+      if (c.evaluationHistory) {
+        try {
+          var history = JSON.parse(c.evaluationHistory);
+          if (Array.isArray(history)) {
+            history.forEach(function(h) {
+              var sc = h.scorecard || {};
+              rows.push({
+                id: c.id,
+                senderName: c.senderName,
+                subject: c.subject,
+                interviewer: h.interviewer || c.assignedInterviewer || '',
+                techScore: sc.tech || 4,
+                commScore: sc.comm || 4,
+                cultureScore: sc.culture || 4,
+                problemScore: sc.problem || 4,
+                weightedAvg: sc.weightedAvg || 4.0,
+                status: h.status || c.status,
+                salary: h.salary || '',
+                notes: h.notes || ''
+              });
+            });
+          }
+        } catch(e) {}
+      }
+    });
+    return { reportCode: reportCode, title: 'Báo cáo Đánh giá Phỏng vấn & Competency Scorecard', count: rows.length, rows: rows };
+
+  } else if (reportCode === 'BC-REC-03') {
+    var candidates = getCandidates() || [];
+    var trendsMap = {};
+    candidates.forEach(function(c) {
+      var dStr = formatDateVal(c.receivedDate);
+      if (!dStr) return;
+      if (!trendsMap[dStr]) {
+        trendsMap[dStr] = { date: dStr, total: 0, suitable: 0, interview: 0, offer: 0, failed: 0 };
+      }
+      trendsMap[dStr].total++;
+      if (c.status === 'Suitable') trendsMap[dStr].suitable++;
+      if (c.status === 'Interview Scheduled' || c.assignedInterviewer) trendsMap[dStr].interview++;
+      if (c.status === 'Offer Sent' || c.offerGross) trendsMap[dStr].offer++;
+      if (c.status === 'Failed' || c.status === 'Unsuitable') trendsMap[dStr].failed++;
+    });
+    var rows = Object.keys(trendsMap).sort().map(function(k) { return trendsMap[k]; });
+    return { reportCode: reportCode, title: 'Báo cáo Xu hướng CV & Thống kê Theo Ngày', count: rows.length, rows: rows };
+
+  // 2. HR & CONTRACT REPORTS
+  } else if (reportCode === 'BC-HR-01') {
+    var employees = getEmployees() || [];
+    var rows = [];
+    employees.forEach(function(e) {
+      if (department !== 'All' && e.department !== department) return;
+      rows.push({
+        id: e.id,
+        fullName: e.fullName,
+        gender: e.gender,
+        email: e.email,
+        phone: e.phone,
+        department: e.department,
+        position: e.position,
+        contractType: e.contractType || 'Chính thức',
+        officialStartDate: e.officialStartDate,
+        status: e.status,
+        bankName: e.bankName || '-',
+        bankAccountNumber: e.bankAccountNumber || '-'
+      });
+    });
+    return { reportCode: reportCode, title: 'Báo cáo Danh mục Nhân sự & Cơ cấu Phòng ban', count: rows.length, rows: rows };
+
+  } else if (reportCode === 'BC-HR-02') {
+    var employees = getEmployees() || [];
+    var rows = [];
+    var today = new Date();
+    employees.forEach(function(e) {
+      if (department !== 'All' && e.department !== department) return;
+      var expDateStr = e.contractExpiryDate || e.endDate || '';
+      var daysRemaining = 999;
+      var alertStatus = 'Còn hạn';
+      if (expDateStr) {
+        var expDate = new Date(expDateStr);
+        if (!isNaN(expDate.getTime())) {
+          var diffTime = expDate.getTime() - today.getTime();
+          daysRemaining = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+          if (daysRemaining < 0) alertStatus = 'Đã quá hạn';
+          else if (daysRemaining <= 30) alertStatus = 'Cần tái ký (<=30 ngày)';
+        }
+      }
+      rows.push({
+        id: e.id,
+        fullName: e.fullName,
+        department: e.department,
+        position: e.position,
+        probationStartDate: e.probationStartDate || '-',
+        officialStartDate: e.officialStartDate || '-',
+        contractExpiryDate: expDateStr || 'Không thời hạn',
+        daysRemaining: daysRemaining === 999 ? '-' : daysRemaining,
+        alertStatus: alertStatus
+      });
+    });
+    return { reportCode: reportCode, title: 'Báo cáo Hết hạn Hợp đồng & Đánh giá Thử việc', count: rows.length, rows: rows };
+
+  } else if (reportCode === 'BC-HR-03') {
+    var jobRead = batchReadSheet('JobHistory');
+    var rows = [];
+    if (jobRead.data && jobRead.data.length > 1) {
+      var headers = jobRead.headers;
+      for (var i = 1; i < jobRead.data.length; i++) {
+        var r = jobRead.data[i];
+        rows.push({
+          id: r[0],
+          employeeId: r[1],
+          employeeName: r[2],
+          changeType: r[3],
+          oldValue: r[4],
+          newValue: r[5],
+          effectiveDate: formatDateVal(r[6]),
+          decisionNumber: r[7] || '-',
+          notes: r[8] || '',
+          createdAt: formatDateVal(r[9])
+        });
+      }
+    }
+    return { reportCode: reportCode, title: 'Báo cáo Lịch sử Biến động Nhân sự & Điều chuyển', count: rows.length, rows: rows };
+
+  // 3. ATTENDANCE & LEAVE REPORTS
+  } else if (reportCode === 'BC-ATT-01') {
+    var logs = getAttendanceLogs('', 'Admin') || [];
+    var rows = [];
+    logs.forEach(function(l) {
+      var d = new Date(l.date || l.checkIn);
+      if (!isNaN(d.getTime())) {
+        if (d.getMonth() + 1 === month && d.getFullYear() === year) {
+          rows.push({
+            employeeId: l.employeeId,
+            employeeName: l.employeeName || l.fullName,
+            date: formatDateVal(l.date),
+            checkIn: l.checkIn ? String(l.checkIn).substring(11, 19) : '-',
+            checkOut: l.checkOut ? String(l.checkOut).substring(11, 19) : '-',
+            ipAddress: l.ipAddress || 'Internal Web',
+            otHours: l.otHours || 0,
+            status: l.status || 'Đúng giờ'
+          });
+        }
+      }
+    });
+    return { reportCode: reportCode, title: 'Báo cáo Chấm công & Hiện diện Tháng ' + month + '/' + year, count: rows.length, rows: rows };
+
+  } else if (reportCode === 'BC-ATT-02') {
+    var employees = getEmployees() || [];
+    var rows = [];
+    employees.forEach(function(e) {
+      if (department !== 'All' && e.department !== department) return;
+      var total = e.totalLeaveDays || 12;
+      var used = e.usedLeaveDays || 0;
+      rows.push({
+        employeeId: e.id,
+        fullName: e.fullName,
+        department: e.department,
+        totalLeaveDays: total,
+        usedLeaveDays: used,
+        remainingLeaveDays: total - used
+      });
+    });
+    return { reportCode: reportCode, title: 'Báo cáo Quỹ Phép Năm & Biến động Phép', count: rows.length, rows: rows };
+
+  } else if (reportCode === 'BC-ATT-03') {
+    var otRead = batchReadSheet('OvertimeRequests');
+    var rows = [];
+    if (otRead.data && otRead.data.length > 1) {
+      for (var i = 1; i < otRead.data.length; i++) {
+        var r = otRead.data[i];
+        var hours = Number(r[3]) || 0;
+        var mult = Number(r[5]) || 1.5;
+        rows.push({
+          id: r[0],
+          employeeId: r[1],
+          date: formatDateVal(r[2]),
+          hours: hours,
+          otType: r[4] || 'Ngày thường',
+          multiplier: mult,
+          convertedHours: (hours * mult).toFixed(1),
+          reason: r[6] || '',
+          approver: r[7] || '',
+          status: r[8] || 'Pending'
+        });
+      }
+    }
+    return { reportCode: reportCode, title: 'Báo cáo Tổng hợp Giờ Tăng ca (OT)', count: rows.length, rows: rows };
+
+  // 4. PAYROLL REPORTS
+  } else if (reportCode === 'BC-PAY-01') {
+    var slips = getPayslips(clientEmail, 'Admin') || [];
+    var rows = [];
+    slips.forEach(function(s) {
+      if (parseInt(s.month, 10) === month && parseInt(s.year, 10) === year) {
+        rows.push({
+          id: s.id,
+          monthYear: s.month + '/' + s.year,
+          employeeId: s.employeeId,
+          employeeName: s.employeeName,
+          totalSalary: s.totalSalary,
+          insurance: s.insurance,
+          tax: s.tax,
+          netSalary: s.netSalary,
+          sentDate: s.sentDate || 'Chưa gửi'
+        });
+      }
+    });
+    return { reportCode: reportCode, title: 'Bảng Tính Lương Chi tiết Tháng ' + month + '/' + year, count: rows.length, rows: rows };
+
+  } else if (reportCode === 'BC-PAY-02') {
+    var res = exportBankPayrollFile(month, year, 'VCB', clientEmail);
+    return { reportCode: reportCode, title: 'Báo cáo Chuyển khoản Ngân hàng VCB Tháng ' + month + '/' + year, count: res.recordCount, fileName: res.fileName, csvContent: res.csvContent };
+
+  } else if (reportCode === 'BC-PAY-03') {
+    var salRead = batchReadSheet('SalaryHistory');
+    var rows = [];
+    if (salRead.data && salRead.data.length > 1) {
+      for (var i = 1; i < salRead.data.length; i++) {
+        var r = salRead.data[i];
+        rows.push({
+          id: r[0],
+          employeeId: r[1],
+          newSalary: Number(r[2]) || 0,
+          changeDate: formatDateVal(r[3]),
+          notes: r[5] || ''
+        });
+      }
+    }
+    return { reportCode: reportCode, title: 'Báo cáo Lịch sử Thay đổi Lương Nhân sự', count: rows.length, rows: rows };
+  }
+
+  throw new Error("Mã báo cáo " + reportCode + " không hợp lệ.");
+}
+
+/**
  * Metadata retrieval helper
  */
 function getSystemMeta() {
