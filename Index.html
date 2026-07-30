@@ -90,8 +90,8 @@
         <?!= include('InterviewerDashboard'); ?>
       </div>
 
-      <!-- Report/Dashboard Analytics View -->
-      <div id="page-dashboard" x-show="activeTab === 'recruitment' && activeSubTab === 'dashboard'" class="transition-fade" x-cloak>
+      <!-- Dashboard & HR Reports Analytics View -->
+      <div id="page-dashboard" x-show="(activeTab === 'recruitment' && activeSubTab === 'dashboard') || activeTab === 'reports'" class="transition-fade">
         <?!= include('Report'); ?>
       </div>
 
