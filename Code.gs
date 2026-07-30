@@ -3852,22 +3852,26 @@ function recordAttendance(userEmail, type, clientIp) {
 /**
  * Fetch attendance logs securely (Role & Identity verified on server)
  */
-function getAttendanceLogs(requestedEmail) {
+function getAttendanceLogs(requestedEmail, requestedRole) {
   var activeEmail = getActiveUserEmail();
-  if (!activeEmail) return [];
+  var email = (activeEmail && activeEmail.length > 0) ? activeEmail : String(requestedEmail || "").toLowerCase().trim();
+  if (!email) return [];
   
-  var role = getUserRoleByEmail(activeEmail);
+  var role = getUserRoleByEmail(email);
+  if (!role || role.length === 0) {
+    role = requestedRole || "Employee";
+  }
+  
   var ss = getSpreadsheet();
   var attSheet = ss.getSheetByName('Attendance');
   var empSheet = ss.getSheetByName('Employees');
-  if (!attSheet || !empSheet) return [];
+  if (!attSheet) return [];
   
-  var empData = empSheet.getDataRange().getValues();
+  var empData = empSheet ? empSheet.getDataRange().getValues() : [];
   var empIdToNameMap = {};
   var empIdToEmailMap = {};
   var empIdToDeptMap = {};
   var targetEmployeeId = "";
-  var userEmail = (role === 'Admin' || role === 'HR') ? String(requestedEmail || activeEmail).toLowerCase().trim() : activeEmail;
   
   for (var i = 1; i < empData.length; i++) {
     var id = String(empData[i][0]).trim();
@@ -3878,17 +3882,32 @@ function getAttendanceLogs(requestedEmail) {
     empIdToEmailMap[id] = empEmail;
     empIdToDeptMap[id] = dept;
     
-    if (empEmail === userEmail) {
+    if (empEmail === email) {
       targetEmployeeId = id;
     }
   }
+  if (!targetEmployeeId) targetEmployeeId = email;
   
   var logs = [];
   var data = attSheet.getDataRange().getValues();
+  if (data.length <= 1) return [];
+  
+  var headers = data[0].map(function(h) { return String(h).trim(); });
+  var idCol = headers.indexOf('ID') !== -1 ? headers.indexOf('ID') : 0;
+  var empIdCol = headers.indexOf('EmployeeID') !== -1 ? headers.indexOf('EmployeeID') : 1;
+  var dateCol = headers.indexOf('Date') !== -1 ? headers.indexOf('Date') : 2;
+  var checkInCol = headers.indexOf('CheckIn') !== -1 ? headers.indexOf('CheckIn') : 3;
+  var checkOutCol = headers.indexOf('CheckOut') !== -1 ? headers.indexOf('CheckOut') : 4;
+  var ipCol = headers.indexOf('IPAddress') !== -1 ? headers.indexOf('IPAddress') : 5;
+  var otCol = headers.indexOf('OT_Hours') !== -1 ? headers.indexOf('OT_Hours') : 6;
+  var statusCol = headers.indexOf('Status') !== -1 ? headers.indexOf('Status') : 7;
+  
+  var timeZone = Session.getScriptTimeZone();
+  
   for (var j = 1; j < data.length; j++) {
-    var empId = String(data[j][1]).trim();
-    var logEmail = empIdToEmailMap[empId] || "";
-    var logDept = empIdToDeptMap[empId] || "";
+    var rowEmpId = String(data[j][empIdCol]).trim();
+    var rowEmail = empIdToEmailMap[rowEmpId] || rowEmpId;
+    var rowDept = empIdToDeptMap[rowEmpId] || "";
     
     var allow = false;
     if (role === 'Admin' || role === 'HR') {
