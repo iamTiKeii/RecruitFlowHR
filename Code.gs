@@ -3996,7 +3996,8 @@ function submitLeaveRequest(leave) {
   var empDept = "";
   var totalLeaveDays = 12;
   var usedLeaveDays = 0;
-  var userEmail = String(leave.employeeEmail || "").toLowerCase().trim();
+  var activeEmail = getActiveUserEmail();
+  var userEmail = (activeEmail && activeEmail.length > 0) ? activeEmail : String(leave.employeeEmail || leave.userEmail || "").toLowerCase().trim();
   
   for (var i = 1; i < empData.length; i++) {
     var sheetEmail = String(empData[i][empEmailCol !== -1 ? empEmailCol : 3]).toLowerCase().trim();
@@ -4303,7 +4304,8 @@ function submitOtRequest(ot) {
     
     var empData = empSheet.getDataRange().getValues();
     var empId = "";
-    var userEmail = String(ot.employeeEmail || "").toLowerCase().trim();
+    var activeEmail = getActiveUserEmail();
+    var userEmail = (activeEmail && activeEmail.length > 0) ? activeEmail : String(ot.employeeEmail || ot.userEmail || "").toLowerCase().trim();
     for (var i = 1; i < empData.length; i++) {
       var email = String(empData[i][3] || empData[i][2]).toLowerCase().trim();
       if (email === userEmail) {
@@ -6978,8 +6980,8 @@ function sendEmailWithFallback(toEmail, subject, htmlBody, attachments) {
  * 1. Xuất file chuyển khoản lương ngân hàng (Vietcombank, Techcombank, VPBank, BIDV)
  * Định dạng chuẩn CSV theo quy cách cổng Internet Banking doanh nghiệp
  */
-function exportBankPayrollFile(month, year, bankCode) {
-  requireRole(['Admin', 'HR']);
+function exportBankPayrollFile(month, year, bankCode, clientEmail) {
+  requireRole(['Admin', 'HR'], clientEmail);
   bankCode = (bankCode || 'VCB').toUpperCase().trim();
   
   var payRead = batchReadSheet('Payroll');

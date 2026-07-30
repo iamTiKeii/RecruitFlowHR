@@ -426,6 +426,9 @@
             Swal.fire('Chú ý', 'Vui lòng chọn đầy đủ thời gian nghỉ phép.', 'warning');
             return;
           }
+          const userStr = localStorage.getItem('recruitment_user');
+          const user = userStr ? JSON.parse(userStr) : null;
+          this.newRequest.employeeEmail = user ? (user.email || user.username) : '';
           
           showLoading('Đang gửi đơn xin nghỉ phép...');
           runBackend('submitLeaveRequest', this.newRequest)
@@ -466,6 +469,9 @@
             Swal.fire('Chú ý', 'Vui lòng nhập ngày và số giờ tăng ca hợp lệ.', 'warning');
             return;
           }
+          const userStr = localStorage.getItem('recruitment_user');
+          const user = userStr ? JSON.parse(userStr) : null;
+          this.newOt.employeeEmail = user ? (user.email || user.username) : '';
           
           showLoading('Đang gửi đơn đăng ký OT...');
           runBackend('submitOtRequest', this.newOt)

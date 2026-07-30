@@ -14,7 +14,7 @@
 
   <!-- Admin/HR Controls Panel -->
   <template x-if="role === 'Admin' || role === 'HR'">
-    <div class="glass-card p-6 rounded-3xl border border-slate-800/80 grid grid-cols-1 md:grid-cols-3 gap-6 shadow-xl items-end text-xs">
+    <div class="glass-card p-6 rounded-3xl border border-slate-800/80 grid grid-cols-1 md:grid-cols-4 gap-4 shadow-xl items-end text-xs">
       <div>
         <label class="block font-bold text-slate-300 uppercase tracking-wider mb-2">Tháng tính lương</label>
         <select x-model="calcMonth" class="w-full px-4 py-3 rounded-xl glass-input text-xs font-bold bg-slate-900">
@@ -31,14 +31,27 @@
           <option value="2028">Năm 2028</option>
         </select>
       </div>
-      <div class="flex gap-3">
-        <button @click="runPayrollCalculation" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/25 transition-all cursor-pointer flex items-center justify-center gap-2">
+      <div>
+        <label class="block font-bold text-slate-300 uppercase tracking-wider mb-2">Ngân hàng chuyển lương</label>
+        <select x-model="selectedBank" class="w-full px-4 py-3 rounded-xl glass-input text-xs font-bold bg-slate-900">
+          <option value="VCB">Vietcombank (VCB)</option>
+          <option value="TCB">Techcombank (TCB)</option>
+          <option value="VPB">VPBank (VPB)</option>
+          <option value="BIDV">BIDV</option>
+        </select>
+      </div>
+      <div class="flex gap-2">
+        <button @click="runPayrollCalculation" class="flex-1 py-3 bg-indigo-600 hover:bg-indigo-500 active:scale-95 text-white rounded-xl text-xs font-bold shadow-lg shadow-indigo-600/25 transition-all cursor-pointer flex items-center justify-center gap-1.5" title="Tính toán bảng lương">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M15.75 15.75V18m-7.5-6.75h.008v.008H8.25v-.008zm0 2.25h.008v.008H8.25V15zm0 2.25h.008v.008H8.25v-.008zm3-6.75h.008v.008H11.25v-.008zm0 2.25h.008v.008H11.25V15zm0 2.25h.008v.008H11.25v-.008zm3-6.75h.008v.008H14.25v-.008zm0 2.25h.008v.008H14.25V15zm0 2.25h.008v.008H14.25v-.008zm3-6.75h.008v.008H17.25v-.008zm0 2.25h.008v.008H17.25V15zm0 2.25h.008v.008H17.25v-.008zM4.5 19.5h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"></path></svg>
-          <span>Tính toán Lương</span>
+          <span>Tính lương</span>
         </button>
-        <button @click="sendPayslipsToAll" class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/25 transition-all cursor-pointer flex items-center justify-center gap-2">
+        <button @click="downloadBankPayrollFile" class="flex-1 py-3 bg-purple-600 hover:bg-purple-500 active:scale-95 text-white rounded-xl text-xs font-bold shadow-lg shadow-purple-600/25 transition-all cursor-pointer flex items-center justify-center gap-1.5" title="Xuất file CSV Ngân hàng">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5M16.5 12L12 16.5m0 0L7.5 12m4.5 4.5V3"></path></svg>
+          <span>Xuất Bank</span>
+        </button>
+        <button @click="sendPayslipsToAll" class="flex-1 py-3 bg-emerald-600 hover:bg-emerald-500 active:scale-95 text-white rounded-xl text-xs font-bold shadow-lg shadow-emerald-600/25 transition-all cursor-pointer flex items-center justify-center gap-1.5" title="Gửi email phiếu lương">
           <svg class="w-4 h-4" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"></path></svg>
-          <span>Gửi Phiếu lương</span>
+          <span>Gửi Email</span>
         </button>
       </div>
     </div>
@@ -176,6 +189,7 @@
         calcMonth: new Date().getMonth() + 1,
         calcYear: new Date().getFullYear(),
         filterMonth: String(new Date().getMonth() + 1),
+        selectedBank: 'VCB',
         showPayslipModal: false,
         activeSlip: null,
 
@@ -223,6 +237,33 @@
             .catch(err => {
               hideLoading();
               Swal.fire('Lỗi tính lương', err.message, 'error');
+            });
+        },
+
+        downloadBankPayrollFile() {
+          showLoading(`Đang khởi tạo tệp chuyển tiền ${this.selectedBank} cho Tháng ${this.calcMonth}/${this.calcYear}...`);
+          const userStr = localStorage.getItem('recruitment_user');
+          const user = userStr ? JSON.parse(userStr) : null;
+          const clientEmail = user ? (user.email || user.username) : '';
+
+          runBackend('exportBankPayrollFile', this.calcMonth, this.calcYear, this.selectedBank, clientEmail)
+            .then(res => {
+              hideLoading();
+              if (res && res.csvContent) {
+                const blob = new Blob(["\uFEFF" + res.csvContent], { type: 'text/csv;charset=utf-8;' });
+                const link = document.createElement("a");
+                const url = URL.createObjectURL(blob);
+                link.setAttribute("href", url);
+                link.setAttribute("download", res.fileName || `BankPayroll_${this.selectedBank}.csv`);
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                Swal.fire('Thành công', `Đã xuất tệp chuyển tiền ${this.selectedBank} gồm ${res.recordCount} bản ghi!`, 'success');
+              }
+            })
+            .catch(err => {
+              hideLoading();
+              Swal.fire('Lỗi xuất tệp ngân hàng', err.message, 'error');
             });
         },
 
