@@ -258,8 +258,8 @@ function migrateLegacyUsersToIndividualSalt() {
  * Server-side RBAC Guard for RPC functions
  */
 function requireRole(allowedRoles, clientEmail) {
-  var role = "Employee";
-  if (clientEmail) {
+  var role = "";
+  if (clientEmail && String(clientEmail).trim().length > 0) {
     role = getUserRoleByEmail(clientEmail);
   } else {
     try {
@@ -270,7 +270,10 @@ function requireRole(allowedRoles, clientEmail) {
     } catch (e) {}
   }
   
-  // If role is still default Employee and Admin is required, check if user matches single admin system
+  if (!role || role.trim().length === 0) {
+    role = "Employee";
+  }
+  
   if (allowedRoles.indexOf(role) === -1 && allowedRoles.indexOf('All') === -1) {
     throw new Error("Bảo mật: Vai trò '" + role + "' không có quyền thực hiện thao tác này.");
   }
@@ -438,8 +441,8 @@ function changePassword(usernameOrEmail, oldPassword, newPassword) {
 /**
  * Get all users for User Management (Admin restricted)
  */
-function getUsersList() {
-  requireRole(['Admin']);
+function getUsersList(clientEmail) {
+  requireRole(['Admin'], clientEmail);
   
   var ss = getSpreadsheet();
   var usersSheet = ss.getSheetByName('Users');
@@ -481,8 +484,8 @@ function getUsersList() {
 /**
  * Add or update a user account in Users sheet (Admin restricted)
  */
-function saveUserAccount(userObj) {
-  requireRole(['Admin']);
+function saveUserAccount(userObj, clientEmail) {
+  requireRole(['Admin'], clientEmail || (userObj && userObj.clientEmail));
   
   if (!userObj || !userObj.email || !userObj.fullName || !userObj.role) {
     return { success: false, message: "Vui lòng nhập đầy đủ Email, Họ tên và Vai trò." };
@@ -567,8 +570,8 @@ function saveUserAccount(userObj) {
 /**
  * Delete a user account from Users sheet (Admin restricted)
  */
-function deleteUserAccount(targetEmail) {
-  requireRole(['Admin']);
+function deleteUserAccount(targetEmail, clientEmail) {
+  requireRole(['Admin'], clientEmail);
   
   if (!targetEmail) {
     return { success: false, message: "Email người dùng không hợp lệ." };
@@ -624,8 +627,8 @@ function deleteUserAccount(targetEmail) {
 /**
  * Admin reset password for a user account (Admin restricted)
  */
-function adminResetUserPassword(targetEmail, newPassword) {
-  requireRole(['Admin']);
+function adminResetUserPassword(targetEmail, newPassword, clientEmail) {
+  requireRole(['Admin'], clientEmail);
   
   if (!targetEmail || !newPassword || String(newPassword).trim().length === 0) {
     return { success: false, message: "Email và Mật khẩu mới không được để trống." };
@@ -911,8 +914,8 @@ function getConfig() {
 /**
  * Save configuration with LockService concurrency protection & Cache invalidation
  */
-function saveConfig(configData) {
-  requireRole(['Admin', 'HR']);
+function saveConfig(configData, clientEmail) {
+  requireRole(['Admin', 'HR'], clientEmail);
   var lock = LockService.getScriptLock();
   try {
     lock.waitLock(10000); // Wait up to 10s
@@ -956,8 +959,8 @@ function saveConfig(configData) {
 /**
  * Setup recurring trigger for Gmail CV scan with automatic trigger cleanup (Optimization #5)
  */
-function setupScheduledGmailScanTrigger(hoursInterval) {
-  requireRole(['Admin', 'HR']);
+function setupScheduledGmailScanTrigger(hoursInterval, clientEmail) {
+  requireRole(['Admin', 'HR'], clientEmail);
   var interval = Number(hoursInterval) || 1;
   
   // Clean up previous triggers for this function to prevent duplicate stack
@@ -1957,8 +1960,8 @@ function getCandidateById(candidateId) {
 /**
  * Remove Candidate record row by ID
  */
-function deleteCandidate(candidateId) {
-  requireRole(['Admin', 'HR']);
+function deleteCandidate(candidateId, clientEmail) {
+  requireRole(['Admin', 'HR'], clientEmail);
   var ss = getSpreadsheet();
   var sheet = ss.getSheetByName('Candidates');
   if (!sheet) throw new Error("Candidates sheet not found");
@@ -2304,9 +2307,10 @@ function getCurrentUserRole() {
     for (var i = 1; i < data.length; i++) {
       var sheetEmail = data[i][0] ? String(data[i][0]).toLowerCase().trim() : "";
       if (sheetEmail === email) {
+        var role = data[i][3] ? String(data[i][3]).trim() : "Employee";
         return {
           email: email,
-          role: data[i][3] ? String(data[i][3]).trim() : "",
+          role: role || "Employee",
           fullName: data[i][2] ? String(data[i][2]).trim() : ""
         };
       }
@@ -2334,15 +2338,17 @@ function getCurrentUserRole() {
     }
   }
   
-  return { email: email, role: "", fullName: "" };
+  return { email: email, role: "Employee", fullName: "" };
 }
 
 /**
  * Helper to fetch a user's role by email.
  */
 function getUserRoleByEmail(email) {
-  if (!email) return "";
-  email = email.toLowerCase().trim();
+  if (!email) return "Employee";
+  email = String(email).toLowerCase().trim();
+  if (!email) return "Employee";
+
   var ss = getSpreadsheet();
   var usersSheet = ss.getSheetByName('Users');
   if (usersSheet) {
@@ -2350,7 +2356,8 @@ function getUserRoleByEmail(email) {
     for (var i = 1; i < data.length; i++) {
       var sheetEmail = data[i][0] ? String(data[i][0]).toLowerCase().trim() : "";
       if (sheetEmail === email) {
-        return data[i][3] ? String(data[i][3]).trim() : "";
+        var foundRole = data[i][3] ? String(data[i][3]).trim() : "";
+        return foundRole || "Employee";
       }
     }
   }
@@ -2370,7 +2377,7 @@ function getUserRoleByEmail(email) {
     }
   }
   
-  return "";
+  return "Employee";
 }
 
 /**
@@ -3022,8 +3029,8 @@ function getEmployees() {
 /**
  * THÊM NHÂN SỰ MỚI (VỚI LOCKSERVICE VÀ CÁC THỦ TỤC TRÍCH XUẤT)
  */
-function addEmployee(emp) {
-    requireRole(['Admin', 'HR']);
+function addEmployee(emp, clientEmail) {
+    requireRole(['Admin', 'HR'], clientEmail || (emp && emp.clientEmail));
     var lock = LockService.getScriptLock();
     try {
         lock.waitLock(10000); // Chờ tối đa 10s tránh trùng mã EMP
