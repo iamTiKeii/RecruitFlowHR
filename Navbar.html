@@ -1,5 +1,5 @@
 <!-- Hierarchical Modern Navbar -->
-<div x-data="{ openRecruitment: false, openAttendance: false, openSettings: false }" class="relative z-40">
+<div x-data="{ openRecruitment: false, openAttendance: false, openSettings: false, mobileMenuOpen: false }" class="relative z-40">
   <!-- Main Header Navbar -->
   <nav id="sidebarPanel" x-show="isLoggedIn" class="w-full fixed top-0 left-0 h-16 bg-slate-900/95 dark:bg-slate-900/95 backdrop-blur-md text-white flex items-center justify-between px-4 md:px-8 shadow-xl border-b border-slate-800/80 z-50 transition-colors">
     
@@ -24,15 +24,15 @@
       </div>
     </div>
 
-    <!-- Center: Main Navigation Links -->
-    <div class="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap scrollbar-none max-w-full py-1">
+    <!-- Center: Main Navigation Links (Desktop: md:flex) -->
+    <div class="hidden md:flex items-center gap-1.5">
       
       <!-- Interviewer Dashboard View (Conditional Role) -->
       <button id="nav-interviewer-dashboard" x-show="role === 'Interviewer'" @click="navigateTo('interviewer-dashboard')" 
               :class="activeTab === 'interviewer-dashboard' ? 'bg-indigo-600/20 text-indigo-300 border border-indigo-500/30' : 'text-slate-300 hover:text-white hover:bg-slate-800/80'" 
               class="flex items-center gap-2 px-3.5 py-2 rounded-xl text-xs font-semibold transition-all">
         <svg class="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
-        Lịch phỏng vấn
+        <span>Lịch phỏng vấn</span>
       </button>
 
       <!-- Recruitment (Dropdown Menu Group) -->
@@ -53,22 +53,22 @@
              x-transition:leave-end="transform opacity-0 scale-95 -translate-y-1" 
              class="absolute left-0 mt-1.5 w-56 bg-slate-900 text-slate-200 border border-slate-800 rounded-2xl shadow-2xl p-1.5 z-50 text-xs backdrop-blur-xl" x-cloak>
           
-          <button @click="navigateTo('dashboard')" class="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-indigo-600/15 hover:text-indigo-300 flex items-center gap-2.5 transition-colors">
+          <button @click="navigateTo('dashboard'); openRecruitment = false" class="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-indigo-600/15 hover:text-indigo-300 flex items-center gap-2.5 transition-colors">
             <svg class="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="9" /><rect x="14" y="3" width="7" height="5" /><rect x="14" y="12" width="7" height="9" /><rect x="3" y="16" width="7" height="5" /></svg>
             <span class="font-medium">Bảng điều khiển</span>
           </button>
           
-          <button @click="navigateTo('scanner')" class="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-indigo-600/15 hover:text-indigo-300 flex items-center gap-2.5 transition-colors">
+          <button @click="navigateTo('scanner'); openRecruitment = false" class="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-indigo-600/15 hover:text-indigo-300 flex items-center gap-2.5 transition-colors">
             <svg class="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M22 17a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3z" /><polyline points="22,7 12,14 2,7" /><circle cx="18" cy="14" r="3" /><line x1="22" y1="18" x2="20" y2="16" /></svg>
             <span class="font-medium">Quét Gmail Tuyển dụng</span>
           </button>
           
-          <button @click="navigateTo('candidates')" class="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-indigo-600/15 hover:text-indigo-300 flex items-center gap-2.5 transition-colors">
+          <button @click="navigateTo('candidates'); openRecruitment = false" class="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-indigo-600/15 hover:text-indigo-300 flex items-center gap-2.5 transition-colors">
             <svg class="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M23 21v-2a4 4 0 0 0-3-3.87" /><path d="M16 3.13a4 4 0 0 1 0 7.75" /></svg>
             <span class="font-medium">Danh sách Ứng viên</span>
           </button>
           
-          <button @click="navigateTo('forms')" class="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-indigo-600/15 hover:text-indigo-300 flex items-center gap-2.5 transition-colors">
+          <button @click="navigateTo('forms'); openRecruitment = false" class="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-indigo-600/15 hover:text-indigo-300 flex items-center gap-2.5 transition-colors">
             <svg class="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /><polyline points="14 2 14 8 20 8" /><line x1="16" y1="13" x2="8" y2="13" /><line x1="16" y1="17" x2="8" y2="17" /><polyline points="10 9 9 9 8 9" /></svg>
             <span class="font-medium">Biểu mẫu Khảo sát</span>
           </button>
@@ -100,12 +100,12 @@
              x-transition:leave-end="transform opacity-0 scale-95 -translate-y-1" 
              class="absolute left-0 mt-1.5 w-56 bg-slate-900 text-slate-200 border border-slate-800 rounded-2xl shadow-2xl p-1.5 z-50 text-xs backdrop-blur-xl" x-cloak>
           
-          <button @click="navigateTo('attendance')" class="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-indigo-600/15 hover:text-indigo-300 flex items-center gap-2.5 transition-colors">
+          <button @click="navigateTo('attendance'); openAttendance = false" class="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-indigo-600/15 hover:text-indigo-300 flex items-center gap-2.5 transition-colors">
             <svg class="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
             <span class="font-medium">Điểm danh & Bảng công</span>
           </button>
           
-          <button @click="navigateTo('leave-module')" class="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-indigo-600/15 hover:text-indigo-300 flex items-center gap-2.5 transition-colors">
+          <button @click="navigateTo('leave-module'); openAttendance = false" class="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-indigo-600/15 hover:text-indigo-300 flex items-center gap-2.5 transition-colors">
             <svg class="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
             <span class="font-medium">Đơn xin nghỉ phép</span>
           </button>
@@ -137,22 +137,22 @@
              x-transition:leave-end="transform opacity-0 scale-95 -translate-y-1" 
              class="absolute left-0 mt-1.5 w-56 bg-slate-900 text-slate-200 border border-slate-800 rounded-2xl shadow-2xl p-1.5 z-50 text-xs backdrop-blur-xl" x-cloak>
           
-          <button @click="navigateTo('settings')" class="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-indigo-600/15 hover:text-indigo-300 flex items-center gap-2.5 transition-colors">
+          <button @click="navigateTo('settings'); openSettings = false" class="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-indigo-600/15 hover:text-indigo-300 flex items-center gap-2.5 transition-colors">
             <svg class="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3" /><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z" /></svg>
             <span class="font-medium">Cấu hình Hệ thống</span>
           </button>
           
-          <button @click="navigateTo('category-manager')" class="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-indigo-600/15 hover:text-indigo-300 flex items-center gap-2.5 transition-colors">
+          <button @click="navigateTo('category-manager'); openSettings = false" class="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-indigo-600/15 hover:text-indigo-300 flex items-center gap-2.5 transition-colors">
             <svg class="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" /><rect x="14" y="3" width="7" height="7" /><rect x="14" y="14" width="7" height="7" /><rect x="3" y="14" width="7" height="7" /></svg>
             <span class="font-medium">Quản lý Danh mục</span>
           </button>
           
-          <button @click="navigateTo('print-templates')" class="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-indigo-600/15 hover:text-indigo-300 flex items-center gap-2.5 transition-colors">
+          <button @click="navigateTo('print-templates'); openSettings = false" class="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-indigo-600/15 hover:text-indigo-300 flex items-center gap-2.5 transition-colors">
             <svg class="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9V2h12v7M6 18H4a2 2 0 0 1-2-2v-5a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v5a2 2 0 0 1-2 2h-2" /><rect x="6" y="14" width="12" height="8" /></svg>
             <span class="font-medium">Quản lý Mẫu in</span>
           </button>
 
-          <button x-show="role === 'Admin'" @click="navigateTo('user-manager')" class="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-indigo-600/15 hover:text-indigo-300 flex items-center gap-2.5 transition-colors text-indigo-400 font-semibold">
+          <button x-show="role === 'Admin'" @click="navigateTo('user-manager'); openSettings = false" class="w-full text-left px-3.5 py-2.5 rounded-xl hover:bg-indigo-600/15 hover:text-indigo-300 flex items-center gap-2.5 transition-colors text-indigo-400 font-semibold">
             <svg class="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="8.5" cy="7" r="4" /><polyline points="17 11 19 13 23 9" /></svg>
             <span>Quản lý Người dùng</span>
           </button>
@@ -161,8 +161,8 @@
 
     </div>
 
-    <!-- Right Controls: Status indicator, Language, Theme switcher, Logout -->
-    <div class="flex items-center gap-3">
+    <!-- Right Controls: Status indicator, Language, Theme switcher, Logout & Mobile Toggle -->
+    <div class="flex items-center gap-2.5 sm:gap-3">
       <!-- Database status ping -->
       <span class="hidden xl:inline-flex items-center gap-2 text-[10px] font-semibold text-emerald-400 bg-emerald-500/10 border border-emerald-500/20 px-3 py-1.5 rounded-full">
         <span class="relative flex h-2 w-2">
@@ -184,16 +184,118 @@
         <svg id="theme-icon-moon" class="w-4 h-4 hidden text-indigo-300" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M21.752 15.002A9.718 9.718 0 0118 15.75c-5.385 0-9.75-4.365-9.75-9.75 0-1.33.266-2.597.748-3.752A9.753 9.753 0 003 11.25C3 16.635 7.365 21 12.75 21a9.753 9.753 0 009.002-5.998z"></path></svg>
       </button>
 
-      <!-- Logout Button -->
-      <button onclick="handleLogout()" class="flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all cursor-pointer">
+      <!-- Logout Button (Desktop) -->
+      <button onclick="handleLogout()" class="hidden sm:flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-semibold text-rose-400 hover:bg-rose-500/10 border border-transparent hover:border-rose-500/20 transition-all cursor-pointer">
         <svg class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 9V5.25A2.25 2.25 0 0013.5 3h-6a2.25 2.25 0 00-2.25 2.25v13.5A2.25 2.25 0 007.5 21h6a2.25 2.25 0 002.25-2.25V15M12 9l-3 3m0 0l3 3m-3-3h12.75"></path>
         </svg>
-        <span data-i18n="logout" class="hidden sm:inline">Đăng xuất</span>
+        <span data-i18n="logout">Đăng xuất</span>
+      </button>
+
+      <!-- Mobile Hamburger Toggle Button -->
+      <button @click="mobileMenuOpen = !mobileMenuOpen" class="md:hidden p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer" title="Menu">
+        <svg x-show="!mobileMenuOpen" class="w-6 h-6" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M3.75 6.75h16.5M3.75 12h16.5m-16.5 5.25h16.5"></path></svg>
+        <svg x-show="mobileMenuOpen" class="w-6 h-6 text-rose-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" x-cloak><path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"></path></svg>
       </button>
     </div>
 
   </nav>
+
+  <!-- Mobile Menu Drawer (Mobile UI/UX Pro Max) -->
+  <div x-show="mobileMenuOpen && isLoggedIn" 
+       x-transition:enter="transition ease-out duration-200"
+       x-transition:enter-start="opacity-0 -translate-y-2"
+       x-transition:enter-end="opacity-100 translate-y-0"
+       x-transition:leave="transition ease-in duration-150"
+       x-transition:leave-start="opacity-100 translate-y-0"
+       x-transition:leave-end="opacity-0 -translate-y-2"
+       class="md:hidden fixed top-16 left-0 w-full bg-slate-900/98 dark:bg-slate-900/98 backdrop-blur-xl border-b border-slate-800 shadow-2xl p-4 z-50 space-y-4 overflow-y-auto max-h-[85vh]" x-cloak>
+    
+    <div class="space-y-3 text-sm font-semibold">
+      
+      <!-- Interviewer -->
+      <button x-show="role === 'Interviewer'" @click="navigateTo('interviewer-dashboard'); mobileMenuOpen = false" class="w-full text-left p-3 rounded-xl hover:bg-slate-800 flex items-center gap-3 text-slate-200">
+        <svg class="w-5 h-5 text-indigo-400" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /><line x1="16" y1="2" x2="16" y2="6" /><line x1="8" y1="2" x2="8" y2="6" /><line x1="3" y1="10" x2="21" y2="10" /></svg>
+        <span>Lịch phỏng vấn</span>
+      </button>
+
+      <!-- Recruitment Section -->
+      <div x-show="role === 'Admin' || role === 'HR'" class="space-y-1">
+        <div class="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-indigo-400">Tuyển dụng</div>
+        <button @click="navigateTo('dashboard'); mobileMenuOpen = false" class="w-full text-left p-3 rounded-xl hover:bg-slate-800 flex items-center gap-3 text-slate-200 pl-6">
+          <svg class="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="9" /><rect x="14" y="3" width="7" height="5" /><rect x="14" y="12" width="7" height="9" /><rect x="3" y="16" width="7" height="5" /></svg>
+          <span>Bảng điều khiển</span>
+        </button>
+        <button @click="navigateTo('scanner'); mobileMenuOpen = false" class="w-full text-left p-3 rounded-xl hover:bg-slate-800 flex items-center gap-3 text-slate-200 pl-6">
+          <svg class="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 17a3 3 0 0 1-3 3H5a3 3 0 0 1-3-3V7a3 3 0 0 1 3-3h14a3 3 0 0 1 3 3z" /><polyline points="22,7 12,14 2,7" /></svg>
+          <span>Quét Gmail Tuyển dụng</span>
+        </button>
+        <button @click="navigateTo('candidates'); mobileMenuOpen = false" class="w-full text-left p-3 rounded-xl hover:bg-slate-800 flex items-center gap-3 text-slate-200 pl-6">
+          <svg class="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /></svg>
+          <span>Danh sách Ứng viên</span>
+        </button>
+        <button @click="navigateTo('forms'); mobileMenuOpen = false" class="w-full text-left p-3 rounded-xl hover:bg-slate-800 flex items-center gap-3 text-slate-200 pl-6">
+          <svg class="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" /></svg>
+          <span>Biểu mẫu Khảo sát</span>
+        </button>
+      </div>
+
+      <!-- Employees -->
+      <button x-show="role === 'Admin' || role === 'HR' || role === 'Manager' || role === 'Employee'" @click="navigateTo('employee-manager'); mobileMenuOpen = false" class="w-full text-left p-3 rounded-xl hover:bg-slate-800 flex items-center gap-3 text-slate-200">
+        <svg class="w-5 h-5 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2" /><circle cx="12" cy="7" r="4" /></svg>
+        <span x-text="role === 'Admin' || role === 'HR' ? 'Nhân sự' : 'Hồ sơ cá nhân'"></span>
+      </button>
+
+      <!-- Attendance Section -->
+      <div class="space-y-1">
+        <div class="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-indigo-400">Chấm công</div>
+        <button @click="navigateTo('attendance'); mobileMenuOpen = false" class="w-full text-left p-3 rounded-xl hover:bg-slate-800 flex items-center gap-3 text-slate-200 pl-6">
+          <svg class="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10" /><polyline points="12 6 12 12 16 14" /></svg>
+          <span>Điểm danh & Bảng công</span>
+        </button>
+        <button @click="navigateTo('leave-module'); mobileMenuOpen = false" class="w-full text-left p-3 rounded-xl hover:bg-slate-800 flex items-center gap-3 text-slate-200 pl-6">
+          <svg class="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="4" width="18" height="18" rx="2" ry="2" /></svg>
+          <span>Đơn xin nghỉ phép</span>
+        </button>
+      </div>
+
+      <!-- Payroll -->
+      <button x-show="role === 'Admin' || role === 'HR' || role === 'Employee'" @click="navigateTo('payroll'); mobileMenuOpen = false" class="w-full text-left p-3 rounded-xl hover:bg-slate-800 flex items-center gap-3 text-slate-200">
+        <svg class="w-5 h-5 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="1" y="4" width="22" height="16" rx="2" ry="2" /><line x1="1" y1="10" x2="23" y2="10" /></svg>
+        <span x-text="role === 'Admin' || role === 'HR' ? 'Tính lương' : 'Phiếu lương'"></span>
+      </button>
+
+      <!-- System Section -->
+      <div x-show="role === 'Admin' || role === 'HR'" class="space-y-1">
+        <div class="px-3 py-1.5 text-[11px] font-bold uppercase tracking-wider text-indigo-400">Hệ thống</div>
+        <button @click="navigateTo('settings'); mobileMenuOpen = false" class="w-full text-left p-3 rounded-xl hover:bg-slate-800 flex items-center gap-3 text-slate-200 pl-6">
+          <svg class="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3" /></svg>
+          <span>Cấu hình Hệ thống</span>
+        </button>
+        <button @click="navigateTo('category-manager'); mobileMenuOpen = false" class="w-full text-left p-3 rounded-xl hover:bg-slate-800 flex items-center gap-3 text-slate-200 pl-6">
+          <svg class="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" /></svg>
+          <span>Quản lý Danh mục</span>
+        </button>
+        <button @click="navigateTo('print-templates'); mobileMenuOpen = false" class="w-full text-left p-3 rounded-xl hover:bg-slate-800 flex items-center gap-3 text-slate-200 pl-6">
+          <svg class="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9V2h12v7" /></svg>
+          <span>Quản lý Mẫu in</span>
+        </button>
+        <button x-show="role === 'Admin'" @click="navigateTo('user-manager'); mobileMenuOpen = false" class="w-full text-left p-3 rounded-xl hover:bg-slate-800 flex items-center gap-3 text-indigo-400 pl-6 font-bold">
+          <svg class="w-4 h-4 text-indigo-400" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M16 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2" /><circle cx="8.5" cy="7" r="4" /></svg>
+          <span>Quản lý Người dùng</span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Mobile Controls: Logout -->
+    <div class="pt-3 border-t border-slate-800 flex items-center justify-between">
+      <span class="text-xs text-slate-400 font-medium">Phiên đăng nhập di động</span>
+      <button onclick="handleLogout(); mobileMenuOpen = false" class="px-4 py-2 rounded-xl text-xs font-bold text-rose-400 bg-rose-500/10 border border-rose-500/20">
+        Đăng xuất
+      </button>
+    </div>
+
+  </div>
 
   <!-- Sub-navigation Bar (Displayed below top navbar when activeTab has sub-views) -->
   <div x-show="isLoggedIn && (activeTab === 'recruitment' || activeTab === 'attendance')" 
