@@ -329,16 +329,29 @@
      */
     function handleLogout() {
       if (confirm('Bạn có muốn đăng xuất? / Do you want to log out?')) {
+        // 1. Clear all user session and authentication caches
         localStorage.removeItem('recruitment_user');
+        localStorage.removeItem('recruitment_user_role');
+        localStorage.removeItem('recruitment_user_email');
+        sessionStorage.clear();
         
-        if (window.Alpine) {
-          const app = document.body && Alpine.$data(document.body);
-          if (app) {
-            app.logout();
-          }
+        // 2. Reset Alpine App state
+        if (window.Alpine && document.body) {
+          try {
+            const app = Alpine.$data(document.body);
+            if (app) {
+              app.isLoggedIn = false;
+              app.user = null;
+              app.role = '';
+              app.activeTab = 'login';
+              if (typeof app.logout === 'function') app.logout();
+            }
+          } catch(e) {}
         }
         
+        // 3. Reset auth state & force reload
         checkAuth();
+        window.location.reload();
       }
     }
 

@@ -269,10 +269,18 @@
         },
 
         init() {
-          this.fetchUsers();
+          const userStr = localStorage.getItem('recruitment_user');
+          const clientUser = userStr ? JSON.parse(userStr) : null;
+          if (clientUser && clientUser.role === 'Admin') {
+            this.fetchUsers();
+          }
           window.addEventListener('nav-changed', (e) => {
             if (e.detail === 'user-manager') {
-              this.fetchUsers();
+              const uStr = localStorage.getItem('recruitment_user');
+              const cUser = uStr ? JSON.parse(uStr) : null;
+              if (cUser && cUser.role === 'Admin') {
+                this.fetchUsers();
+              }
             }
           });
         },
@@ -280,7 +288,12 @@
         fetchUsers() {
           const userStr = localStorage.getItem('recruitment_user');
           const clientUser = userStr ? JSON.parse(userStr) : null;
-          const clientEmail = clientUser ? (clientUser.email || clientUser.username) : '';
+          if (!clientUser || clientUser.role !== 'Admin') {
+            this.users = [];
+            this.isLoading = false;
+            return;
+          }
+          const clientEmail = clientUser.email || clientUser.username || '';
           
           this.isLoading = true;
           runBackend('getUsersList', clientEmail)
