@@ -6562,6 +6562,70 @@ function getDecisionPrintHtml(decisionId) {
 }
 
 /**
+/**
+ * Tự động khởi tạo 5 Mẫu in Chuẩn Doanh nghiệp (HTML to PDF) nếu sheet rỗng
+ */
+function seedDefaultPrintTemplates() {
+  var ss = getSpreadsheet();
+  var sheet = ss.getSheetByName('PrintTemplates');
+  if (!sheet) {
+    initializeDatabaseV2();
+    sheet = ss.getSheetByName('PrintTemplates');
+  }
+  if (!sheet) return;
+
+  var data = sheet.getDataRange().getValues();
+  if (data.length > 1) return; // Đã có dữ liệu
+
+  var templates = [
+    [
+      'TPL-0001',
+      'Hợp đồng Lao động Chính thức',
+      'Hợp đồng',
+      '<div style="font-family: Arial, sans-serif; padding: 25px; line-height: 1.6; color: #000; font-size: 13px;"><div style="text-align: center; margin-bottom: 20px;"><h3 style="margin:0; text-transform: uppercase; font-size: 14px;">CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM</h3><p style="margin:3px 0 0 0; font-weight: bold;">Độc lập - Tự do - Hạnh phúc</p><p style="margin: 0;">-----------------------</p><h2 style="margin: 20px 0 5px 0; color: #1e1b4b; font-size: 18px; text-transform: uppercase;">HỢP ĐỒNG LAO ĐỘNG</h2><p style="margin: 0; font-style: italic;">Số: HĐLD-{{id}}/2026</p></div><p>Hôm nay, ngày {{officialStartDate}}, tại Văn phòng Công ty, chúng tôi gồm có:</p><p><b>BÊN A (NĂNG LỰC SỬ DỤNG LAO ĐỘNG):</b> CÔNG TY RECRUITFLOW HRM<br>Đại diện bởi: Giám đốc Nhân sự<br>Địa chỉ: Tòa nhà Văn phòng, TP. Hồ Chí Minh</p><p><b>BÊN B (NGƯỜI LAO ĐỘNG):</b><br>Ông/Bà: <b>{{fullName}}</b><br>Mã nhân sự: <b>{{id}}</b> | Giới tính: {{gender}}<br>Email: {{email}} | Số điện thoại: {{phone}}<br>Địa chỉ: {{currentAddress}}</p><h4 style="margin: 15px 0 5px 0; font-size: 14px;">ĐIỀU 1: CÔNG VIỆC VÀ THỜI HẠN HỢP ĐỒNG</h4><p>- Vị trí công tác: <b>{{position}}</b><br>- Phòng ban: <b>{{department}}</b><br>- Ngày bắt đầu làm việc: <b>{{officialStartDate}}</b><br>- Loại hợp đồng: {{contractType}}</p><h4 style="margin: 15px 0 5px 0; font-size: 14px;">ĐIỀU 2: LƯƠNG THƯỞNG VÀ PHỤ CẤP</h4><p>- Mức lương cơ bản: <b>{{basicSalary}}</b><br>- Lương đóng bảo hiểm xã hội: <b>{{socialInsuranceSalary}}</b><br>- Khoản phụ cấp áp dụng: {{allowances}}<br>- Hình thức trả lương: Chuyển khoản ngân hàng <b>{{bankName}}</b> (Số TK: <b>{{bankAccountNumber}}</b> - {{bankAccountHolder}})</p><h4 style="margin: 15px 0 5px 0; font-size: 14px;">ĐIỀU 3: NGHĨA VỤ VÀ QUYỀN LỢI</h4><p>- Được hưởng chế độ BHXH, BHYT, BHTN theo quy định pháp luật.<br>- Được hưởng <b>{{totalLeaveDays}} ngày phép năm</b> có hưởng lương.</p><div style="margin-top: 40px; display: flex; justify-content: space-between; text-align: center;"><div><p><b>ĐẠI DIỆN BÊN A</b><br><i>(Ký và ghi rõ họ tên)</i></p><br><br><br><p><b>CÔNG TY RECRUITFLOW HRM</b></p></div><div><p><b>NGƯỜI LAO ĐỘNG (BÊN B)</b><br><i>(Ký và ghi rõ họ tên)</i></p><br><br><br><p><b>{{fullName}}</b></p></div></div></div>',
+      'Mẫu Hợp đồng lao động chính thức chuẩn A4 điều khoản Bộ Luật Lao Động 2019',
+      new Date()
+    ],
+    [
+      'TPL-0002',
+      'Quyết định Tuyển dụng & Thử việc',
+      'Quyết định',
+      '<div style="font-family: Arial, sans-serif; padding: 25px; line-height: 1.6; color: #000; font-size: 13px;"><div style="display: flex; justify-content: space-between; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px;"><div><b>CÔNG TY RECRUITFLOW HRM</b><br><small>Ban Quản trị Nhân sự</small></div><div style="text-align: right;"><b>Số: QĐ-TV/{{id}}</b><br><i>TP.HCM, ngày {{probationStartDate}}</i></div></div><div style="text-align: center; margin-bottom: 25px;"><h2 style="margin: 0; font-size: 18px; text-transform: uppercase;">QUYẾT ĐỊNH</h2><p style="margin: 5px 0 0 0; font-weight: bold; font-style: italic;">V/v Tiếp nhận và Phân công Công tác Thử việc</p></div><p><b>GIÁM ĐỐC NHÂN SỰ CÔNG TY RECRUITFLOW HRM</b></p><p>- Căn cứ Bộ Luật Lao động Việt Nam hiện hành;<br>- Căn cứ Nhu cầu tuyển dụng và Đánh giá năng lực ứng viên;</p><h3 style="text-align: center; margin: 15px 0;">QUYẾT ĐỊNH</h3><p><b>Điều 1:</b> Tiếp nhận Ông/Bà <b>{{fullName}}</b> (Mã NV: {{id}}) vào làm việc tại Công ty kể từ ngày <b>{{probationStartDate}}</b>.</p><p><b>Điều 2:</b> Phân công đảm nhiệm vị trí: <b>{{position}}</b> thuộc <b>{{department}}</b>.<br>- Mức lương thử việc: <b>{{probationSalary}}</b><br>- Thời gian thử việc: 02 tháng.</p><p><b>Điều 3:</b> Các Trưởng phòng ban liên quan và Ông/Bà {{fullName}} chịu trách nhiệm thi hành quyết định này.</p><div style="margin-top: 40px; text-align: right;"><p><b>GIÁM ĐỐC NHÂN SỰ</b><br><i>(Đã ký)</i></p></div></div>',
+      'Mẫu Quyết định tiếp nhận nhân sự thử việc và phân công vị trí công tác',
+      new Date()
+    ],
+    [
+      'TPL-0003',
+      'Quyết định Điều chỉnh Mức lương',
+      'Quyết định',
+      '<div style="font-family: Arial, sans-serif; padding: 25px; line-height: 1.6; color: #000; font-size: 13px;"><div style="text-align: center; margin-bottom: 20px;"><h2 style="margin: 0; font-size: 18px; text-transform: uppercase; color: #4338ca;">QUYẾT ĐỊNH ĐIỀU CHỈNH LƯƠNG</h2><p style="margin: 5px 0 0 0; font-style: italic;">Số: QĐ-TL/{{id}}/2026</p></div><p>Căn cứ Kết quả đánh giá hiệu suất công việc và Đề xuất tăng lương của Trưởng bộ phận <b>{{department}}</b>;</p><h3 style="text-align: center; margin: 15px 0;">QUYẾT ĐỊNH</h3><p><b>Điều 1:</b> Điều chỉnh tăng mức lương cơ bản cho Nhân sự: <b>{{fullName}}</b> (Mã NV: <b>{{id}}</b>), Chức vụ: <b>{{position}}</b>.</p><p><b>Điều 2:</b> Mức lương cơ bản mới áp dụng: <b>{{basicSalary}}</b>.<br>- Thời gian hiệu lực: Kể từ ngày <b>{{officialStartDate}}</b>.<br>- Tài khoản nhận lương: <b>{{bankName}} - {{bankAccountNumber}}</b> (Chủ TK: {{bankAccountHolder}}).</p><p><b>Điều 3:</b> Bộ phận Kế toán & Phòng Nhân sự chịu trách nhiệm thực hiện quyết định này.</p><div style="margin-top: 40px; display: flex; justify-content: space-between;"><div><p><b>Nơi nhận:</b><br>- Như Điều 3;<br>- Lưu HSNS.</p></div><div style="text-align: center;"><p><b>TM. BAN GIÁM ĐỐC</b><br><i>(Ký và đóng dấu)</i></p></div></div></div>',
+      'Mẫu Quyết định tăng lương định kỳ hoặc khen thưởng nhân sự xuất sắc',
+      new Date()
+    ],
+    [
+      'TPL-0004',
+      'Thư Mời Nhận Việc (Job Offer Letter)',
+      'Thư mời',
+      '<div style="font-family: Arial, sans-serif; padding: 25px; line-height: 1.6; color: #000; font-size: 13px;"><div style="text-align: center; margin-bottom: 25px;"><h2 style="margin: 0; color: #4338ca; font-size: 20px;">THƯ MỜI NHẬN VIỆC (JOB OFFER)</h2><p style="margin: 5px 0 0 0; color: #64748b;">Công ty RecruitFlow HRM</p></div><p>Thân gửi Ông/Bà <b>{{fullName}}</b>,</p><p>Thay mặt Công ty RecruitFlow HRM, chúng tôi trân trọng chúc mừng và mời Bạn gia nhập đội ngũ với thông tin chi tiết như sau:</p><div style="background-color: #f8fafc; border: 1px solid #cbd5e1; padding: 15px; border-radius: 8px; margin: 15px 0;"><p style="margin: 4px 0;">- Vị trí làm việc: <b>{{position}}</b></p><p style="margin: 4px 0;">- Phòng ban công tác: <b>{{department}}</b></p><p style="margin: 4px 0;">- Ngày bắt đầu làm việc: <b>{{officialStartDate}}</b></p><p style="margin: 4px 0;">- Mức lương Gross đề xuất: <b>{{basicSalary}}</b></p><p style="margin: 4px 0;">- Chế độ đãi ngộ: BHXH, Thưởng KPIs, {{totalLeaveDays}} ngày phép năm</p></div><p>Rất mong nhận được phản hồi xác nhận tham gia của Bạn trước 17:00 ngày tới.</p><p>Trân trọng,<br><b>Bộ phận Tuyển dụng RecruitFlow HRM</b></p></div>',
+      'Mẫu Thư mời nhận việc gửi ứng viên trúng tuyển chính thức',
+      new Date()
+    ],
+    [
+      'TPL-0005',
+      'Phiếu Lương Chi Tiết Nhân Viên',
+      'Phiếu lương',
+      '<div style="font-family: Arial, sans-serif; padding: 25px; line-height: 1.5; color: #000; font-size: 13px; max-width: 600px; margin: auto; border: 1px solid #cbd5e1; border-radius: 12px;"><div style="text-align: center; margin-bottom: 20px;"><h2 style="margin: 0; color: #4338ca; font-size: 18px;">PHIẾU LƯƠNG NHÂN VIÊN</h2><p style="margin: 5px 0 0 0; color: #64748b;">Công ty RecruitFlow HRM</p></div><table style="width: 100%; border-collapse: collapse; margin-bottom: 20px;"><tr><td style="padding: 4px 0;">Mã Nhân viên:</td><td style="text-align: right; font-weight: bold;">{{id}}</td></tr><tr><td style="padding: 4px 0;">Họ và Tên:</td><td style="text-align: right; font-weight: bold;">{{fullName}}</td></tr><tr><td style="padding: 4px 0;">Phòng ban:</td><td style="text-align: right;">{{department}}</td></tr><tr><td style="padding: 4px 0;">Chức vụ:</td><td style="text-align: right;">{{position}}</td></tr></table><h4 style="border-bottom: 2px solid #e2e8f0; padding-bottom: 6px; margin-bottom: 10px;">Chi tiết Khoản Thu nhập & Khấu trừ</h4><table style="width: 100%; border-collapse: collapse;"><tr><td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">Lương cơ bản Gross:</td><td style="text-align: right; font-weight: bold;">{{basicSalary}}</td></tr><tr><td style="padding: 8px 0; border-bottom: 1px solid #f1f5f9;">Khấu trừ BHXH (10.5%):</td><td style="text-align: right; color: #e11d48;">-10.5%</td></tr><tr style="background-color: #f8fafc; font-weight: bold; font-size: 14px;"><td style="padding: 10px; color: #16a34a;">LƯƠNG THỰC LĨNH (NET):</td><td style="text-align: right; padding: 10px; color: #16a34a;">{{basicSalary}}</td></tr></table><p style="margin-top: 15px; font-size: 11px; color: #64748b;">Thanh toán vào TK: {{bankName}} - {{bankAccountNumber}} (Chủ TK: {{bankAccountHolder}})</p></div>',
+      'Mẫu Phiếu lương cá nhân hàng tháng kết xuất HTML sang PDF',
+      new Date()
+    ]
+  ];
+
+  for (var i = 0; i < templates.length; i++) {
+    sheet.appendRow(templates[i]);
+  }
+}
+
+/**
  * Lấy toàn bộ danh sách mẫu in từ sheet PrintTemplates
  */
 function getPrintTemplates() {
@@ -6572,6 +6636,12 @@ function getPrintTemplates() {
       initializeDatabaseV2();
       sheet = ss.getSheetByName('PrintTemplates');
     }
+    
+    // Tự động nạp 5 mẫu in mặc định nếu sheet rỗng
+    if (sheet.getLastRow() <= 1) {
+      seedDefaultPrintTemplates();
+    }
+
     var data = sheet.getDataRange().getValues();
     if (data.length <= 1) return [];
 
