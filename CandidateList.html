@@ -117,6 +117,12 @@
    * Fetch candidates from Sheet database and render table
    */
   function loadCandidatesTable() {
+    const todayStr = new Date().toISOString().split('T')[0];
+    const dateFromElem = document.getElementById('cand-date-from');
+    const dateToElem = document.getElementById('cand-date-to');
+    if (dateFromElem && !dateFromElem.value) dateFromElem.value = todayStr;
+    if (dateToElem && !dateToElem.value) dateToElem.value = todayStr;
+
     const currentLang = localStorage.getItem('recruitment_lang') || 'vi';
     const loadMsg = currentLang === 'vi' ? 'Đang tải danh sách ứng viên...' : 'Loading candidates list...';
     showLoading(loadMsg);

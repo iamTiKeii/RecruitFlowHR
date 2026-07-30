@@ -137,6 +137,11 @@
 
   window.addEventListener('DOMContentLoaded', () => {
     seedDefaultKeyword();
+    const todayStr = new Date().toISOString().split('T')[0];
+    const sStart = document.getElementById('scan-start-date');
+    const sEnd = document.getElementById('scan-end-date');
+    if (sStart && !sStart.value) sStart.value = todayStr;
+    if (sEnd && !sEnd.value) sEnd.value = todayStr;
   });
 
   function executeScan() {

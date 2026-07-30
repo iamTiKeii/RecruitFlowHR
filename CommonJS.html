@@ -1484,6 +1484,9 @@
 
     document.getElementById('offer-cand-id').value = candidateId;
 
+    const todayStr = new Date().toISOString().split('T')[0];
+    const expiryStr = new Date(Date.now() + 7 * 86400000).toISOString().split('T')[0];
+
     // Process and show Interviewer recommendations if available in evaluationHistory
     const recCard = document.getElementById('interviewer-recommendation-card');
     const recSalary = document.getElementById('recommend-salary');
@@ -1519,7 +1522,7 @@
       }
 
       if (!cand.offerStartDate) {
-        document.getElementById('offer-start-date').value = matchedRec.startDate || '';
+        document.getElementById('offer-start-date').value = matchedRec.startDate || todayStr;
       } else {
         document.getElementById('offer-start-date').value = cand.offerStartDate;
       }
@@ -1527,8 +1530,11 @@
       if (recCard) recCard.classList.add('hidden');
       document.getElementById('offer-gross').value = cand.offerGross || '';
       document.getElementById('offer-probation').value = cand.probationSalary || cand.offerGross || '';
-      document.getElementById('offer-start-date').value = cand.offerStartDate || '';
+      document.getElementById('offer-start-date').value = cand.offerStartDate || todayStr;
     }
+
+    const expiryElem = document.getElementById('offer-expiry-date');
+    if (expiryElem) expiryElem.value = cand.offerExpiryDate || expiryStr;
 
     document.getElementById('offer-net').value = cand.offerNet || '';
 

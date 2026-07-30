@@ -233,7 +233,7 @@
   function openAssessmentModal(candidateId) {
     document.getElementById('assess-cand-id').value = candidateId;
     document.getElementById('assess-salary').value = '';
-    document.getElementById('assess-start-date').value = '';
+    document.getElementById('assess-start-date').value = new Date().toISOString().split('T')[0];
     document.getElementById('assess-notes').value = '';
     
     const radios = document.getElementsByName('assess-result');

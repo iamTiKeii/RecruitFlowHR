@@ -351,13 +351,13 @@
         },
         newRequest: {
           leaveType: 'Nghỉ phép năm',
-          startDate: '',
-          endDate: '',
+          startDate: new Date().toISOString().split('T')[0],
+          endDate: new Date().toISOString().split('T')[0],
           reason: '',
           employeeEmail: ''
         },
         newOt: {
-          date: '',
+          date: new Date().toISOString().split('T')[0],
           hours: 2,
           otType: 'Ngày thường',
           reason: '',

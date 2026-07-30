@@ -79,9 +79,10 @@
           <h3 class="text-base font-bold text-white">Nhật ký chấm công theo ngày</h3>
           
           <!-- Filters for HR/Manager -->
-          <div x-show="role === 'Admin' || role === 'HR' || role === 'Manager'" class="flex gap-2">
-            <input type="text" x-model="searchQuery" placeholder="Tìm tên/email..." class="px-3 py-2 text-xs rounded-xl glass-input w-44 font-medium">
-            <select x-model="filterDept" class="px-3 py-2 text-xs rounded-xl glass-input bg-slate-900 font-semibold">
+          <div class="flex flex-wrap items-center gap-2">
+            <input type="date" x-model="filterDate" title="Lọc theo ngày" class="px-3 py-2 text-xs rounded-xl glass-input font-mono">
+            <input type="text" x-model="searchQuery" placeholder="Tìm tên/email..." class="px-3 py-2 text-xs rounded-xl glass-input w-44 font-medium" x-show="role === 'Admin' || role === 'HR' || role === 'Manager'">
+            <select x-model="filterDept" class="px-3 py-2 text-xs rounded-xl glass-input bg-slate-900 font-semibold" x-show="role === 'Admin' || role === 'HR' || role === 'Manager'">
               <option value="All">Tất cả phòng ban</option>
               <template x-for="dept in departments" :key="dept">
                 <option :value="dept" x-text="dept"></option>
@@ -156,6 +157,7 @@
         liveDate: '',
         searchQuery: '',
         filterDept: 'All',
+        filterDate: new Date().toISOString().split('T')[0],
         departments: [],
         excelData: [],
 
@@ -272,7 +274,8 @@
                                   (log.employeeName && log.employeeName.toLowerCase().includes(this.searchQuery.toLowerCase())) ||
                                   (log.employeeEmail && log.employeeEmail.toLowerCase().includes(this.searchQuery.toLowerCase()));
             const matchesDept = this.filterDept === 'All' || log.department === this.filterDept;
-            return matchesSearch && matchesDept;
+            const matchesDate = !this.filterDate || log.date === this.filterDate;
+            return matchesSearch && matchesDept && matchesDate;
           });
         }
       }));
