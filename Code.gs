@@ -255,6 +255,21 @@ function migrateLegacyUsersToIndividualSalt() {
 
 
 /**
+ * Safely get active or effective session user email
+ */
+function getActiveUserEmail() {
+  try {
+    var email = Session.getActiveUser().getEmail();
+    if (!email || email.trim().length === 0) {
+      email = Session.getEffectiveUser().getEmail();
+    }
+    return email ? String(email).toLowerCase().trim() : "";
+  } catch (e) {
+    return "";
+  }
+}
+
+/**
  * Server-side RBAC Guard for RPC functions
  */
 function requireRole(allowedRoles, clientEmail) {
