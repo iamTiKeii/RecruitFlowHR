@@ -1601,37 +1601,47 @@ function getReports() {
   var total = 0, suitable = 0, unsuitable = 0, newCount = 0;
   var candData = [];
   
+  var statusCol = 6;
+  var dateCol = 1;
+  
   if (candSheet) {
     candData = candSheet.getDataRange().getValues();
-    total = candData.length - 1;
-    for (var i = 1; i < candData.length; i++) {
-      var status = candData[i][6] ? String(candData[i][6]).trim() : "";
-      if (status === "Suitable") suitable++;
-      else if (status === "Unsuitable") unsuitable++;
-      else if (status === "New") newCount++;
+    if (candData.length > 1) {
+      var headers = candData[0].map(function(h) { return String(h).trim(); });
+      if (headers.indexOf('Status') !== -1) statusCol = headers.indexOf('Status');
+      if (headers.indexOf('ReceivedDate') !== -1) dateCol = headers.indexOf('ReceivedDate');
+      
+      total = candData.length - 1;
+      for (var i = 1; i < candData.length; i++) {
+        var status = candData[i][statusCol] ? String(candData[i][statusCol]).trim() : "";
+        if (status === "Suitable") suitable++;
+        else if (status === "Unsuitable" || status === "Failed") unsuitable++;
+        else if (status === "New") newCount++;
+      }
     }
   }
   
   var intSheet = ss.getSheetByName('Interviews');
   var interviewScheduled = 0;
   if (intSheet) {
-    interviewScheduled = intSheet.getDataRange().getValues().length - 1;
+    interviewScheduled = Math.max(0, intSheet.getDataRange().getValues().length - 1);
   }
   
   var trends = {};
   var today = new Date();
+  var timeZone = Session.getScriptTimeZone();
   for (var d = 14; d >= 0; d--) {
     var tempDate = new Date();
     tempDate.setDate(today.getDate() - d);
-    var dateString = Utilities.formatDate(tempDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
+    var dateString = Utilities.formatDate(tempDate, timeZone, "yyyy-MM-dd");
     trends[dateString] = 0;
   }
   
   for (var i = 1; i < candData.length; i++) {
-    var recDate = candData[i][1];
+    var recDate = candData[i][dateCol];
     var datePart = "";
     if (recDate instanceof Date) {
-      datePart = Utilities.formatDate(recDate, Session.getScriptTimeZone(), "yyyy-MM-dd");
+      datePart = Utilities.formatDate(recDate, timeZone, "yyyy-MM-dd");
     } else if (typeof recDate === "string") {
       datePart = recDate.split(" ")[0];
     }
