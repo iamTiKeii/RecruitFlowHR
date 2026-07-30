@@ -3683,7 +3683,157 @@ function importAttendanceExcel(dataRows) {
 }
 
 /**
- * Fetch attendance logs based on RBAC filters
+ * Record live Check-In / Check-Out for an employee with LockService & GracePeriod protection
+ */
+function recordAttendance(userEmail, type, clientIp) {
+  var lock = LockService.getScriptLock();
+  try {
+    lock.waitLock(10000);
+    var activeEmail = getActiveUserEmail();
+    var email = (activeEmail && activeEmail.length > 0) ? activeEmail : userEmail;
+    if (!email) throw new Error("Email người dùng không hợp lệ.");
+    
+    email = String(email).toLowerCase().trim();
+    var ss = getSpreadsheet();
+    var attSheet = ss.getSheetByName('Attendance');
+    var empSheet = ss.getSheetByName('Employees');
+    if (!attSheet) {
+      initializeDatabaseV2();
+      attSheet = ss.getSheetByName('Attendance');
+    }
+    
+    // Find Employee ID
+    var empId = "";
+    if (empSheet) {
+      var empData = empSheet.getDataRange().getValues();
+      for (var i = 1; i < empData.length; i++) {
+        var sheetEmail = empData[i][2] ? String(empData[i][2]).toLowerCase().trim() : "";
+        if (sheetEmail === email) {
+          empId = String(empData[i][0]).trim();
+          break;
+        }
+      }
+    }
+    if (!empId) empId = email;
+    
+    var now = new Date();
+    var timeZone = Session.getScriptTimeZone();
+    var todayStr = Utilities.formatDate(now, timeZone, "yyyy-MM-dd");
+    var currentTimeStr = Utilities.formatDate(now, timeZone, "HH:mm:ss");
+    
+    var configs = getConfig();
+    var startTimeConfig = configs.attendance_start_time || "08:00";
+    var endTimeConfig = configs.attendance_end_time || "17:00";
+    var gracePeriod = parseInt(configs.grace_period_minutes || 15, 10);
+    
+    var data = attSheet.getDataRange().getValues();
+    var headers = data[0].map(function(h) { return String(h).trim(); });
+    var idCol = headers.indexOf('ID') !== -1 ? headers.indexOf('ID') : 0;
+    var empIdCol = headers.indexOf('EmployeeID') !== -1 ? headers.indexOf('EmployeeID') : 1;
+    var dateCol = headers.indexOf('Date') !== -1 ? headers.indexOf('Date') : 2;
+    var checkInCol = headers.indexOf('CheckIn') !== -1 ? headers.indexOf('CheckIn') : 3;
+    var checkOutCol = headers.indexOf('CheckOut') !== -1 ? headers.indexOf('CheckOut') : 4;
+    var ipCol = headers.indexOf('IPAddress') !== -1 ? headers.indexOf('IPAddress') : 5;
+    var otCol = headers.indexOf('OT_Hours') !== -1 ? headers.indexOf('OT_Hours') : 6;
+    var statusCol = headers.indexOf('Status') !== -1 ? headers.indexOf('Status') : 7;
+    
+    var targetRowIndex = -1;
+    var existingCheckIn = "";
+    
+    for (var j = 1; j < data.length; j++) {
+      var rowEmpId = String(data[j][empIdCol]).trim();
+      var rowDateStr = "";
+      if (data[j][dateCol] instanceof Date) {
+        rowDateStr = Utilities.formatDate(data[j][dateCol], timeZone, "yyyy-MM-dd");
+      } else {
+        rowDateStr = String(data[j][dateCol]).trim();
+      }
+      
+      if (rowEmpId === empId && rowDateStr === todayStr) {
+        targetRowIndex = j + 1;
+        existingCheckIn = data[j][checkInCol] ? String(data[j][checkInCol]).trim() : "";
+        break;
+      }
+    }
+    
+    var status = "Đúng giờ";
+    
+    if (type === 'checkin') {
+      var nowMinutes = now.getHours() * 60 + now.getMinutes();
+      var startParts = startTimeConfig.split(':');
+      var startMinutes = (parseInt(startParts[0], 10) * 60 + parseInt(startParts[1] || 0, 10)) + gracePeriod;
+      
+      if (nowMinutes > startMinutes) {
+        status = "Đi muộn";
+      } else {
+        status = "Đúng giờ";
+      }
+      
+      if (targetRowIndex > 0) {
+        attSheet.getRange(targetRowIndex, checkInCol + 1).setValue(currentTimeStr);
+        if (clientIp) attSheet.getRange(targetRowIndex, ipCol + 1).setValue(clientIp);
+        attSheet.getRange(targetRowIndex, statusCol + 1).setValue(status);
+      } else {
+        var newId = "ATT-" + Number(now);
+        var rowData = [];
+        var maxCol = Math.max(idCol, empIdCol, dateCol, checkInCol, checkOutCol, ipCol, otCol, statusCol) + 1;
+        for (var c = 0; c < maxCol; c++) {
+          if (c === idCol) rowData.push(newId);
+          else if (c === empIdCol) rowData.push(empId);
+          else if (c === dateCol) rowData.push(todayStr);
+          else if (c === checkInCol) rowData.push(currentTimeStr);
+          else if (c === checkOutCol) rowData.push("");
+          else if (c === ipCol) rowData.push(clientIp || "");
+          else if (c === otCol) rowData.push(0);
+          else if (c === statusCol) rowData.push(status);
+          else rowData.push("");
+        }
+        attSheet.appendRow(rowData);
+      }
+    } else if (type === 'checkout') {
+      var nowMinutes = now.getHours() * 60 + now.getMinutes();
+      var endParts = endTimeConfig.split(':');
+      var endMinutes = parseInt(endParts[0], 10) * 60 + parseInt(endParts[1] || 0, 10);
+      
+      if (nowMinutes < endMinutes && existingCheckIn) {
+        status = "Về sớm";
+      } else {
+        status = "Đúng giờ";
+      }
+      
+      if (targetRowIndex > 0) {
+        attSheet.getRange(targetRowIndex, checkOutCol + 1).setValue(currentTimeStr);
+        if (clientIp) attSheet.getRange(targetRowIndex, ipCol + 1).setValue(clientIp);
+        if (status === "Về sớm") {
+          attSheet.getRange(targetRowIndex, statusCol + 1).setValue(status);
+        }
+      } else {
+        var newId = "ATT-" + Number(now);
+        var rowData = [];
+        var maxCol = Math.max(idCol, empIdCol, dateCol, checkInCol, checkOutCol, ipCol, otCol, statusCol) + 1;
+        for (var c = 0; c < maxCol; c++) {
+          if (c === idCol) rowData.push(newId);
+          else if (c === empIdCol) rowData.push(empId);
+          else if (c === dateCol) rowData.push(todayStr);
+          else if (c === checkInCol) rowData.push("");
+          else if (c === checkOutCol) rowData.push(currentTimeStr);
+          else if (c === ipCol) rowData.push(clientIp || "");
+          else if (c === otCol) rowData.push(0);
+          else if (c === statusCol) rowData.push(status);
+          else rowData.push("");
+        }
+        attSheet.appendRow(rowData);
+      }
+    }
+    
+    return { success: true, time: currentTimeStr, status: status, date: todayStr };
+  } catch (e) {
+    throw new Error("Lỗi Check-In/Out: " + e.message);
+  } finally {
+    try { lock.releaseLock(); } catch(err) {}
+  }
+}
+
 /**
  * Fetch attendance logs securely (Role & Identity verified on server)
  */

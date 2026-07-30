@@ -25,7 +25,7 @@
     </div>
 
     <!-- Center: Main Navigation Links -->
-    <div class="flex items-center gap-1.5">
+    <div class="flex items-center gap-1.5 overflow-x-auto whitespace-nowrap scrollbar-none max-w-full py-1">
       
       <!-- Interviewer Dashboard View (Conditional Role) -->
       <button id="nav-interviewer-dashboard" x-show="role === 'Interviewer'" @click="navigateTo('interviewer-dashboard')" 
@@ -197,7 +197,7 @@
 
   <!-- Sub-navigation Bar (Displayed below top navbar when activeTab has sub-views) -->
   <div x-show="isLoggedIn && (activeTab === 'recruitment' || activeTab === 'attendance')" 
-       class="w-full fixed top-16 left-0 h-11 bg-slate-900/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80 flex items-center px-4 md:px-8 z-40 text-xs shadow-md transition-colors" x-cloak>
+       class="w-full fixed top-16 left-0 h-11 bg-slate-900/90 dark:bg-slate-900/90 backdrop-blur-md border-b border-slate-800/80 flex items-center px-4 md:px-8 z-40 text-xs shadow-md transition-colors overflow-x-auto whitespace-nowrap scrollbar-none" x-cloak>
     
     <!-- Recruitment Sub-tabs -->
     <div x-show="activeTab === 'recruitment'" class="flex items-center gap-6">

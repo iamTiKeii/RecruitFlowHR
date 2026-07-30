@@ -413,4 +413,57 @@
     color: #0f172a !important;
     border: 1px solid rgba(226, 232, 240, 1) !important;
   }
+
+  /* --- Mobile UI/UX Pro Max Optimization System --- */
+  @media (max-width: 768px) {
+    /* Prevent iOS Safari automatic zoom on form input focus */
+    input[type="text"],
+    input[type="number"],
+    input[type="email"],
+    input[type="date"],
+    input[type="datetime-local"],
+    input[type="password"],
+    select,
+    textarea {
+      font-size: 16px !important;
+    }
+
+    /* Standard Apple & Android minimum touch target height (44px) */
+    button,
+    select,
+    input[type="submit"],
+    input[type="button"],
+    .touch-target {
+      min-height: 44px;
+    }
+
+    /* Hide scrollbars for smooth horizontal navigation sliders */
+    .scrollbar-none::-webkit-scrollbar {
+      display: none;
+    }
+    .scrollbar-none {
+      -ms-overflow-style: none;
+      scrollbar-width: none;
+    }
+
+    /* Responsive Modal Scaling & Touch Insets for Mobile Devices */
+    .modal-content,
+    div[id*="modal"] > div {
+      width: 94vw !important;
+      max-height: 88vh !important;
+      padding: 1.25rem !important;
+      border-radius: 1.25rem !important;
+    }
+
+    /* Mobile Glass Card Padding & Border Radius Adjustments */
+    .glass-card {
+      padding: 1.25rem !important;
+      border-radius: 1.25rem !important;
+    }
+
+    /* Smooth Touch Drag for Overflowing Tables */
+    .overflow-x-auto {
+      -webkit-overflow-scrolling: touch;
+    }
+  }
 </style>
